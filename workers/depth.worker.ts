@@ -262,9 +262,11 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   }
 
   setPhase("análisis de la pista de video");
+  // Only a prefix of the packets is scanned: enough for a solid frame rate
+  // estimate, but `packetCount` is that sample size, not the real total.
   const stats = await track.computePacketStats(60);
-  const totalFrames = Math.max(1, stats.packetCount);
   const fps = stats.averagePacketRate || 30;
+  const estimatedFrames = Math.max(1, Math.round(duration * fps));
 
   // Side-by-side doubles the width, so halve the budget to stay within
   // typical hardware encoder limits.
@@ -435,9 +437,11 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
 
     const frameMsg: WorkerResponse = {
       type: "frame",
-      progress: Math.min(1, frameIndex / totalFrames),
+      // Timestamps are exact, so progress reflects the real position in the
+      // clip instead of a guessed frame total.
+      progress: Math.min(1, Math.max(0, lastEnd / duration)),
       frameIndex,
-      totalFrames,
+      totalFrames: Math.max(estimatedFrames, frameIndex),
       preview,
     };
 
