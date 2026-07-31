@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #05070d;
+  --color-panel: #0d1220;
+  --color-edge: #1d2436;
+  --color-accent: #5b8cff;
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: #e8ecf6;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-image:
+    radial-gradient(60rem 40rem at 15% -10%, rgba(91, 140, 255, 0.16), transparent 60%),
+    radial-gradient(50rem 40rem at 95% 0%, rgba(160, 90, 255, 0.12), transparent 55%);
+  background-attachment: fixed;
+}
