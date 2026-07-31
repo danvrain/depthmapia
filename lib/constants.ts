@@ -45,6 +45,30 @@ export const MODELS = {
 export type ModelKey = keyof typeof MODELS;
 export const DEFAULT_MODEL: ModelKey = "depth-anything-v2-small";
 
+export const QUALITY_LEVELS = {
+  high: { label: "Alta", note: "archivo mínimo, puede bandear" },
+  veryHigh: { label: "Muy alta", note: "equilibrada" },
+  max: { label: "Máxima", note: "recomendado — bitrate fijo, sin bandeo" },
+} as const;
+
+export type QualityKey = keyof typeof QUALITY_LEVELS;
+
+/**
+ * Depth maps are smooth and compress to almost nothing under constant-quality
+ * encoding, which is exactly where banding appears — and banded depth is
+ * quantised depth, which degrades anything consuming it downstream.
+ */
+export const DEFAULT_QUALITY: QualityKey = "max";
+
+export const SMOOTHING_LEVELS = {
+  off: { label: "Desactivado", alpha: 0 },
+  soft: { label: "Suave", alpha: 0.4 },
+  strong: { label: "Fuerte", alpha: 0.65 },
+} as const;
+
+export type SmoothingKey = keyof typeof SMOOTHING_LEVELS;
+export const DEFAULT_SMOOTHING: SmoothingKey = "soft";
+
 export const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 
 export function formatBytes(bytes: number): string {

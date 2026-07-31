@@ -9,12 +9,18 @@ import { detectCapabilities, type Capabilities } from "@/lib/capabilities";
 import { baseName, downloadBlob } from "@/lib/download";
 import {
   DEFAULT_MODEL,
+  DEFAULT_QUALITY,
+  DEFAULT_SMOOTHING,
   MAX_CLIP_SECONDS,
   MAX_FILE_BYTES,
   MAX_SOURCE_SECONDS,
   MODELS,
+  QUALITY_LEVELS,
+  SMOOTHING_LEVELS,
   formatBytes,
   type ModelKey,
+  type QualityKey,
+  type SmoothingKey,
 } from "@/lib/constants";
 import type {
   ColorMode,
@@ -76,6 +82,8 @@ export default function Home() {
 
   const [model, setModel] = useState<ModelKey>(DEFAULT_MODEL);
   const [colorMode, setColorMode] = useState<ColorMode>("grayscale");
+  const [quality, setQuality] = useState<QualityKey>(DEFAULT_QUALITY);
+  const [smoothing, setSmoothing] = useState<SmoothingKey>(DEFAULT_SMOOTHING);
   const [stabilize, setStabilize] = useState(true);
   const [invert, setInvert] = useState(false);
 
@@ -204,11 +212,13 @@ export default function Home() {
       model,
       colorMode,
       range,
+      quality,
+      smoothing,
       stabilize,
       invert,
     };
     workerRef.current.postMessage(req);
-  }, [file, model, colorMode, range, stabilize, invert, reset]);
+  }, [file, model, colorMode, range, quality, smoothing, stabilize, invert, reset]);
 
   const cancel = useCallback(() => {
     workerRef.current?.postMessage({ type: "cancel" } satisfies WorkerRequest);
@@ -307,6 +317,42 @@ export default function Home() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-medium text-white/80">Calidad</span>
+            <select
+              value={quality}
+              disabled={busy}
+              onChange={(e) => setQuality(e.target.value as QualityKey)}
+              className="rounded-lg border border-[var(--color-edge)] bg-[var(--color-ink)] px-3 py-2 outline-none focus:border-[var(--color-accent)]"
+            >
+              {Object.entries(QUALITY_LEVELS).map(([key, q]) => (
+                <option key={key} value={key}>
+                  {q.label} — {q.note}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-medium text-white/80">
+              Suavizado temporal
+            </span>
+            <select
+              value={smoothing}
+              disabled={busy}
+              onChange={(e) => setSmoothing(e.target.value as SmoothingKey)}
+              className="rounded-lg border border-[var(--color-edge)] bg-[var(--color-ink)] px-3 py-2 outline-none focus:border-[var(--color-accent)]"
+            >
+              {Object.entries(SMOOTHING_LEVELS).map(([key, sm]) => (
+                <option key={key} value={key}>
+                  {sm.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="flex flex-wrap gap-6 text-sm">

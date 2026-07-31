@@ -1,4 +1,4 @@
-import type { ModelKey } from "./constants";
+import type { ModelKey, QualityKey, SmoothingKey } from "./constants";
 
 /** Selected portion of the source video, in seconds. */
 export type Range = { start: number; end: number };
@@ -13,6 +13,11 @@ export type WorkerRequest =
       colorMode: ColorMode;
       /** Only this slice of the source video is decoded and processed. */
       range: Range;
+      /** Encoding fidelity. Depth maps compress extremely well, so the default
+       *  quantizer-based setting yields very small files that can band. */
+      quality: QualityKey;
+      /** Per-pixel temporal blending, which removes frame-to-frame shimmer. */
+      smoothing: SmoothingKey;
       /** Smooths depth range across frames to stop the output from flickering. */
       stabilize: boolean;
       /** Invert so that near = black instead of near = white. */

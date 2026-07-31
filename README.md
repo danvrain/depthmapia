@@ -58,6 +58,16 @@ Dos formas de sacar un still, pensadas para alimentar modelos image-to-video:
   normaliza cada frame de forma independiente, lo que provoca un parpadeo muy
   visible en video; esta opción lo elimina casi por completo. Activado por defecto.
 - **Invertir**: cambia la convención a cerca = negro.
+- **Calidad**: Alta, Muy alta o Máxima. Los mapas de profundidad son lisos y se
+  comprimen a casi nada bajo codificación de calidad constante, que es justo
+  donde aparece el bandeo — y profundidad bandeada es profundidad cuantizada.
+  Medido a 1280x720: Alta da 0.11 Mbps, Muy alta 0.40 Mbps y Máxima 6.11 Mbps.
+  Por defecto Máxima, que fija el bitrate en función de resolución y framerate.
+- **Suavizado temporal**: mezcla cada píxel con el del frame anterior, quitando
+  la vibración que queda tras estabilizar el rango global. Medido en una zona
+  estática, la variación media entre frames baja de 3.31 niveles a 1.71 (Suave)
+  o 1.00 (Fuerte). Valores altos dejan estela en movimientos rápidos, por eso es
+  un nivel y no un interruptor.
 
 ## Desarrollo
 

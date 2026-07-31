@@ -16,6 +16,7 @@ import {
   Mp4OutputFormat,
   NullTarget,
   Output,
+  Quality,
   QUALITY_HIGH,
   WebMOutputFormat,
   getFirstEncodableVideoCodec,
@@ -30,6 +31,7 @@ import {
   MIN_CLIP_SECONDS,
   MODELS,
   OUTPUT_MAX_SIDE,
+  SMOOTHING_LEVELS,
 } from "../lib/constants";
 import type { ColorMode, WorkerRequest, WorkerResponse } from "../lib/types";
 
@@ -304,7 +306,8 @@ async function pickWorkingCodec(
 /* -------------------------------------------------------------------------- */
 
 async function process(req: Extract<WorkerRequest, { type: "process" }>) {
-  const { file, model, colorMode, range, stabilize, invert } = req;
+  const { file, model, colorMode, range, quality, smoothing, stabilize, invert } =
+    req;
 
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(
@@ -395,6 +398,23 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const outCanvas = new OffscreenCanvas(canvasWidth, canvasHeight);
   const outCtx = outCanvas.getContext("2d")!;
 
+  // Depth maps are smooth and compress extremely well, so the default
+  // quantizer-based setting produces very small files — and smooth gradients
+  // are exactly what shows banding. 'max' pins an explicit bitrate instead.
+  const encodingQuality =
+    quality === "high"
+      ? new Quality("high")
+      : quality === "veryHigh"
+        ? new Quality("very-high")
+        : new Quality({
+            bitrate: Math.round(
+              Math.min(
+                24_000_000,
+                Math.max(2_000_000, canvasWidth * canvasHeight * targetFps * 0.18),
+              ),
+            ),
+          });
+
   setPhase("selección de códec");
   const {
     codec,
@@ -410,7 +430,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
 
   const source = new CanvasSource(outCanvas, {
     codec,
-    quality: QUALITY_HIGH,
+    quality: encodingQuality,
     keyFrameInterval: 1,
     ...codecOptions,
   });
@@ -427,6 +447,15 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   // Exponential moving average of the depth range. Normalising each frame
   // independently makes the output flicker badly, because the min/max shift
   // frame to frame; smoothing the range removes almost all of it.
+  // Per-pixel exponential blending with the previous frame. The global range
+  // stabiliser below removes brightness pulsing; this removes the shimmer of
+  // individual pixels disagreeing frame to frame. Higher values trail on fast
+  // motion, so it is offered as a level rather than forced on.
+  const smoothAlpha = SMOOTHING_LEVELS[smoothing].alpha;
+  const previousDepth =
+    smoothAlpha > 0 ? new Float32Array(infSize.width * infSize.height) : null;
+  let hasPrevious = false;
+
   let emaMin = 0;
   let emaMax = 1;
   let hasRange = false;
@@ -484,6 +513,12 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     for (let i = 0, p = 0; i < depth.length; i++, p += 4) {
       let v = ((depth[i] - min) / range) * 255;
       v = v < 0 ? 0 : v > 255 ? 255 : v;
+
+      if (previousDepth) {
+        v = hasPrevious ? previousDepth[i] * smoothAlpha + v * (1 - smoothAlpha) : v;
+        previousDepth[i] = v;
+      }
+
       let g = v | 0;
       if (invert) g = 255 - g;
 
@@ -500,6 +535,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     }
 
     setPhase(`dibujado del frame ${frameIndex + 1}`);
+    if (previousDepth) hasPrevious = true;
     depthCtx.putImageData(depthImage, 0, 0);
 
     if (colorMode === "sideBySide") {
