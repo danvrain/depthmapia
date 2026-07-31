@@ -40,6 +40,16 @@ const post = (msg: WorkerResponse, transfer: Transferable[] = []) =>
 
 let canceled = false;
 
+/**
+ * Tracks how far the pipeline got. Browsers throw very generic messages here —
+ * WebKit in particular reports a bare "Type error" — so the phase is usually
+ * the only thing that identifies what actually broke.
+ */
+let phase = "inicio";
+const setPhase = (p: string) => {
+  phase = p;
+};
+
 /* -------------------------------------------------------------------------- */
 /* Model loading                                                              */
 /* -------------------------------------------------------------------------- */
@@ -50,6 +60,7 @@ let cachedPipe: DepthEstimationPipeline | null = null;
 async function getEstimator(modelKey: keyof typeof MODELS) {
   if (cachedKey === modelKey && cachedPipe) return cachedPipe;
 
+  setPhase("carga del modelo");
   const { id, dtype } = MODELS[modelKey];
   post({
     type: "status",
@@ -77,6 +88,7 @@ async function getEstimator(modelKey: keyof typeof MODELS) {
   // some browsers — fall back to WASM rather than failing outright.
   let pipe: DepthEstimationPipeline;
   try {
+    setPhase("carga del modelo (WebGPU)");
     pipe = await pipeline("depth-estimation", id, {
       device: "webgpu",
       dtype: "fp32",
@@ -88,6 +100,7 @@ async function getEstimator(modelKey: keyof typeof MODELS) {
       stage: "loadingModel",
       message: "WebGPU no disponible, usando CPU (más lento)…",
     });
+    setPhase("carga del modelo (WASM)");
     pipe = await pipeline("depth-estimation", id, {
       device: "wasm",
       dtype,
@@ -169,6 +182,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const estimator = await getEstimator(model);
   if (canceled) return;
 
+  setPhase("lectura del contenedor de video");
   post({ type: "status", stage: "reading", message: "Leyendo el video…" });
 
   const input = new Input({
@@ -186,6 +200,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     );
   }
 
+  setPhase("análisis de la pista de video");
   const stats = await track.computePacketStats(60);
   const totalFrames = Math.max(1, stats.packetCount);
   const fps = stats.averagePacketRate || 30;
@@ -224,6 +239,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const outCanvas = new OffscreenCanvas(canvasWidth, canvasHeight);
   const outCtx = outCanvas.getContext("2d")!;
 
+  setPhase("selección de códec");
   const codec = await getFirstEncodableVideoCodec(
     ["avc", "vp9", "av1", "vp8"] as VideoCodec[],
     { width: canvasWidth, height: canvasHeight },
@@ -245,6 +261,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     quality: QUALITY_HIGH,
     keyFrameInterval: 1,
   });
+  setPhase("apertura del codificador");
   output.addVideoTrack(source, { frameRate: fps });
   await output.start();
 
@@ -270,7 +287,9 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
       return;
     }
 
+    setPhase(`decodificación del frame ${frameIndex + 1}`);
     infCtx.drawImage(canvas, 0, 0, infSize.width, infSize.height);
+    setPhase(`inferencia del frame ${frameIndex + 1}`);
     const { predicted_depth } = await estimator(RawImage.fromCanvas(infCanvas));
     const depth = predicted_depth.data as Float32Array;
 
@@ -316,6 +335,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
       pixels[p + 3] = 255;
     }
 
+    setPhase(`dibujado del frame ${frameIndex + 1}`);
     depthCtx.putImageData(depthImage, 0, 0);
 
     if (colorMode === "sideBySide") {
@@ -331,26 +351,40 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
       outCtx.drawImage(depthCanvas, 0, 0, canvasWidth, canvasHeight);
     }
 
+    setPhase(`codificación del frame ${frameIndex + 1}`);
     await source.add(timestamp, frameDuration);
 
     frameIndex++;
-    // The frame is already encoded at this point, so it is safe to transfer
-    // the canvas contents away for the live preview.
-    const shouldPreview = frameIndex === 1 || frameIndex % 5 === 0;
-    const preview = shouldPreview ? outCanvas.transferToImageBitmap() : undefined;
 
-    post(
-      {
-        type: "frame",
-        progress: Math.min(1, frameIndex / totalFrames),
-        frameIndex,
-        totalFrames,
-        preview,
-      },
-      preview ? [preview] : [],
-    );
+    // The frame is already encoded at this point, so it is safe to transfer
+    // the canvas contents away for the live preview. The preview is purely
+    // cosmetic, so never let it abort a run that is otherwise fine — not every
+    // browser can transfer an ImageBitmap across the worker boundary.
+    let preview: ImageBitmap | undefined;
+    if (frameIndex === 1 || frameIndex % 5 === 0) {
+      try {
+        preview = outCanvas.transferToImageBitmap();
+      } catch {
+        preview = undefined;
+      }
+    }
+
+    const frameMsg: WorkerResponse = {
+      type: "frame",
+      progress: Math.min(1, frameIndex / totalFrames),
+      frameIndex,
+      totalFrames,
+      preview,
+    };
+
+    try {
+      post(frameMsg, preview ? [preview] : []);
+    } catch {
+      post({ ...frameMsg, preview: undefined });
+    }
   }
 
+  setPhase("cierre del archivo");
   post({ type: "status", stage: "encoding", message: "Cerrando el archivo…" });
   await output.finalize();
 
@@ -377,10 +411,18 @@ self.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
   }
 
   canceled = false;
+  phase = "inicio";
   process(req).catch((err: unknown) => {
-    post({
-      type: "error",
-      message: err instanceof Error ? err.message : String(err),
-    });
+    // The full object carries the stack, which the message alone does not.
+    console.error(`[DepthMapIA] falló en: ${phase}`, err);
+
+    let detail: string;
+    if (err instanceof Error) {
+      detail = err.message ? `${err.name}: ${err.message}` : err.name;
+    } else {
+      detail = String(err);
+    }
+
+    post({ type: "error", message: `${detail} — falló en: ${phase}` });
   });
 });

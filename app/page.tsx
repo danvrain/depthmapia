@@ -202,7 +202,10 @@ export default function Home() {
 
       {error && (
         <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {error}
+          <p className="font-medium break-words">{error}</p>
+          <p className="mt-1 text-xs text-red-200/60">
+            Abre la consola del navegador para ver el detalle completo.
+          </p>
         </div>
       )}
 
