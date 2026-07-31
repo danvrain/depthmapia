@@ -24,8 +24,9 @@ import {
 
 import {
   INFERENCE_MAX_SIDE,
-  MAX_DURATION_SECONDS,
+  MAX_CLIP_SECONDS,
   MAX_FILE_BYTES,
+  MIN_CLIP_SECONDS,
   MODELS,
   OUTPUT_MAX_SIDE,
 } from "../lib/constants";
@@ -232,7 +233,7 @@ async function pickWorkingCodec(
 /* -------------------------------------------------------------------------- */
 
 async function process(req: Extract<WorkerRequest, { type: "process" }>) {
-  const { file, model, colorMode, stabilize, invert } = req;
+  const { file, model, colorMode, range, stabilize, invert } = req;
 
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(
@@ -254,10 +255,22 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const track = await input.getPrimaryVideoTrack();
   if (!track) throw new Error("El archivo no contiene una pista de video.");
 
-  const duration = await input.computeDuration();
-  if (duration > MAX_DURATION_SECONDS + 0.05) {
+  const sourceDuration = await input.computeDuration();
+
+  // The trim comes from the UI, so re-clamp it here: the worker must never
+  // depend on the caller having got the bounds right.
+  const start = Math.min(Math.max(0, range.start), Math.max(0, sourceDuration - MIN_CLIP_SECONDS));
+  const end = Math.min(range.end, sourceDuration);
+  const duration = end - start;
+
+  if (duration < MIN_CLIP_SECONDS) {
     throw new Error(
-      `El video dura ${duration.toFixed(1)}s y el máximo es ${MAX_DURATION_SECONDS}s.`,
+      `La selección dura ${duration.toFixed(1)}s y el mínimo es ${MIN_CLIP_SECONDS}s.`,
+    );
+  }
+  if (duration > MAX_CLIP_SECONDS + 0.05) {
+    throw new Error(
+      `La selección dura ${duration.toFixed(1)}s y el máximo es ${MAX_CLIP_SECONDS}s.`,
     );
   }
 
@@ -336,7 +349,11 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   let frameIndex = 0;
   let lastEnd = 0;
 
-  for await (const { canvas, timestamp, duration: frameDuration } of sink.canvases()) {
+  for await (const {
+    canvas,
+    timestamp,
+    duration: frameDuration,
+  } of sink.canvases(start, end)) {
     if (canceled) {
       await output.cancel();
       return;
@@ -411,7 +428,11 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     // Phone recordings are frequently variable frame rate, and the last frame
     // of a clip can report a zero or missing duration. Feeding that to the
     // encoder throws an opaque error, so fall back to the average frame time.
-    const safeTimestamp = Number.isFinite(timestamp) && timestamp >= 0 ? timestamp : lastEnd;
+    // Rebased to the start of the selection, otherwise a clip trimmed from
+    // the middle would begin with a gap the length of everything skipped.
+    const rebased = timestamp - start;
+    const safeTimestamp =
+      Number.isFinite(rebased) && rebased >= 0 ? rebased : lastEnd;
     const safeDuration =
       Number.isFinite(frameDuration) && frameDuration > 0
         ? frameDuration

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { ACCEPTED_TYPES, MAX_DURATION_SECONDS, formatBytes } from "@/lib/constants";
+import { ACCEPTED_TYPES, MAX_CLIP_SECONDS, formatBytes } from "@/lib/constants";
 
 export function Dropzone({
   onFile,
@@ -66,8 +66,8 @@ export function Dropzone({
       </svg>
       <p className="text-lg font-medium">Arrastra tu video aquí</p>
       <p className="text-sm text-white/50">
-        o haz clic para elegirlo · MP4, MOV o WebM · máx {MAX_DURATION_SECONDS}s y{" "}
-        {formatBytes(maxBytes)}
+        o haz clic para elegirlo · MP4, MOV o WebM · hasta {formatBytes(maxBytes)}
+        {" "}· recortas {MAX_CLIP_SECONDS}s para procesar
       </p>
     </div>
   );

@@ -4,16 +4,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CompatBanner } from "@/components/CompatBanner";
 import { Dropzone } from "@/components/Dropzone";
+import { TrimBar } from "@/components/TrimBar";
 import { detectCapabilities, type Capabilities } from "@/lib/capabilities";
 import {
   DEFAULT_MODEL,
-  MAX_DURATION_SECONDS,
+  MAX_CLIP_SECONDS,
   MAX_FILE_BYTES,
+  MAX_SOURCE_SECONDS,
   MODELS,
   formatBytes,
   type ModelKey,
 } from "@/lib/constants";
-import type { ColorMode, Stage, WorkerRequest, WorkerResponse } from "@/lib/types";
+import type {
+  ColorMode,
+  Range,
+  Stage,
+  WorkerRequest,
+  WorkerResponse,
+} from "@/lib/types";
 
 type Result = { url: string; extension: string; bytes: number };
 
@@ -42,6 +50,7 @@ export default function Home() {
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
+  const [range, setRange] = useState<Range>({ start: 0, end: MAX_CLIP_SECONDS });
   const [stage, setStage] = useState<Stage>("idle");
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState(0);
@@ -136,13 +145,19 @@ export default function Home() {
 
       try {
         const seconds = await readDuration(picked);
-        if (seconds > MAX_DURATION_SECONDS + 0.05) {
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+          setError("No se pudo determinar la duración del video.");
+          return;
+        }
+        if (seconds > MAX_SOURCE_SECONDS) {
           setError(
-            `El video dura ${seconds.toFixed(1)}s y el máximo es ${MAX_DURATION_SECONDS}s.`,
+            `El video dura ${(seconds / 60).toFixed(1)} min y el máximo es ${MAX_SOURCE_SECONDS / 60} min.`,
           );
           return;
         }
         setDuration(seconds);
+        // Start with the longest allowed clip from the beginning.
+        setRange({ start: 0, end: Math.min(seconds, MAX_CLIP_SECONDS) });
         setFile(picked);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -161,11 +176,12 @@ export default function Home() {
       file,
       model,
       colorMode,
+      range,
       stabilize,
       invert,
     };
     workerRef.current.postMessage(req);
-  }, [file, model, colorMode, stabilize, invert, reset]);
+  }, [file, model, colorMode, range, stabilize, invert, reset]);
 
   const cancel = useCallback(() => {
     workerRef.current?.postMessage({ type: "cancel" } satisfies WorkerRequest);
@@ -180,9 +196,9 @@ export default function Home() {
           Depth<span className="text-[var(--color-accent)]">MapIA</span>
         </h1>
         <p className="max-w-xl text-white/60">
-          Sube un video de hasta {MAX_DURATION_SECONDS} segundos y descárgalo
-          convertido en mapa de profundidad. Todo corre en tu navegador — el
-          archivo nunca se sube a ningún servidor.
+          Sube un video, recorta los {MAX_CLIP_SECONDS} segundos que te interesan
+          y descárgalos convertidos en mapa de profundidad. Todo corre en tu
+          navegador — el archivo nunca se sube a ningún servidor.
         </p>
       </header>
 
@@ -209,6 +225,16 @@ export default function Home() {
             Abre la consola del navegador para ver el detalle completo.
           </p>
         </div>
+      )}
+
+      {file && duration !== null && (
+        <TrimBar
+          file={file}
+          duration={duration}
+          value={range}
+          onChange={setRange}
+          disabled={busy}
+        />
       )}
 
       <section className="grid gap-5 rounded-2xl border border-[var(--color-edge)] bg-[var(--color-panel)]/60 p-5">

@@ -1,8 +1,9 @@
 # DepthMapIA
 
 Plataforma para convertir videos cortos en mapas de profundidad. El usuario sube
-un video de hasta **15 segundos** y **20 MB**, la app genera el mapa de
-profundidad y le entrega el video listo para descargar.
+un video de hasta **20 MB**, recorta el tramo que le interesa (hasta **15
+segundos**), la app genera el mapa de profundidad y le entrega el video listo
+para descargar.
 
 ## Cómo funciona
 
@@ -17,6 +18,16 @@ video → mediabunny (decodifica) → Depth Anything V2 (transformers.js + WebGP
 Esto es lo que hace posible alojarlo en cPanel: el hosting solo sirve archivos
 estáticos, y el cómputo lo pone la máquina de quien sube el video. No hay costo
 por video ni límites de RAM del servidor.
+
+### Recorte
+
+El video de origen puede durar hasta 10 minutos; lo que se limita a 15 segundos
+es la selección. El editor muestra miniaturas, permite arrastrar los extremos o
+deslizar la ventana completa, y reproduce solo el tramo elegido en bucle.
+
+Solo se decodifica el tramo seleccionado — no se recorta ni se re-codifica el
+archivo de entrada — y los timestamps se rebasan a cero para que el resultado no
+arranque con un hueco.
 
 ### Opciones disponibles
 
@@ -106,10 +117,12 @@ puede codificar H.264, se usa VP9 dentro del mismo contenedor MP4.
 
 ```
 app/                 UI (Next.js App Router, export estático)
-components/          Dropzone
+components/          Dropzone, editor de recorte, aviso de compatibilidad
 lib/                 Límites, catálogo de modelos, tipos compartidos
 workers/             Worker con decodificación, inferencia y codificación
 ```
 
-Los límites de 15 s y 20 MB están en `lib/constants.ts` y se validan dos veces:
-en la UI antes de descargar el modelo, y otra vez dentro del worker.
+Los límites están en `lib/constants.ts` (`MAX_CLIP_SECONDS`,
+`MAX_SOURCE_SECONDS`, `MAX_FILE_BYTES`) y se validan dos veces: en la UI antes
+de descargar el modelo, y otra vez dentro del worker, que vuelve a acotar el
+rango recibido en lugar de confiar en él.

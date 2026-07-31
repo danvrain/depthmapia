@@ -1,5 +1,15 @@
-/** Hard limits enforced on every uploaded video. */
-export const MAX_DURATION_SECONDS = 15;
+/** Longest clip that can be processed, measured after trimming. */
+export const MAX_CLIP_SECONDS = 15;
+
+/**
+ * Longest source video accepted. Longer videos are still refused, but well
+ * above the clip limit so there is something worth trimming.
+ */
+export const MAX_SOURCE_SECONDS = 10 * 60;
+
+/** Shortest selection that still makes sense to process. */
+export const MIN_CLIP_SECONDS = 0.5;
+
 export const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
 
 /**

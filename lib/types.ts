@@ -1,5 +1,8 @@
 import type { ModelKey } from "./constants";
 
+/** Selected portion of the source video, in seconds. */
+export type Range = { start: number; end: number };
+
 export type ColorMode = "grayscale" | "inferno" | "sideBySide";
 
 export type WorkerRequest =
@@ -8,6 +11,8 @@ export type WorkerRequest =
       file: File;
       model: ModelKey;
       colorMode: ColorMode;
+      /** Only this slice of the source video is decoded and processed. */
+      range: Range;
       /** Smooths depth range across frames to stop the output from flickering. */
       stabilize: boolean;
       /** Invert so that near = black instead of near = white. */
