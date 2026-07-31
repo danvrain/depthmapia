@@ -26,8 +26,19 @@ es la selección. El editor muestra miniaturas, permite arrastrar los extremos o
 deslizar la ventana completa, y reproduce solo el tramo elegido en bucle.
 
 Solo se decodifica el tramo seleccionado — no se recorta ni se re-codifica el
-archivo de entrada — y los timestamps se rebasan a cero para que el resultado no
-arranque con un hueco.
+archivo de entrada.
+
+### Framerate constante
+
+La salida se muestrea sobre una rejilla temporal fija, no copiando los tiempos
+del origen. Las cámaras de teléfono graban a framerate variable, y arrastrar esa
+irregularidad produce micro-trabones muy visibles en un mapa de profundidad,
+donde no hay motion blur ni textura que los disimule.
+
+Medido con una fuente que alterna 30 y 24 fps: copiando los tiempos del origen
+la salida tenía intervalos de 0 a 66 ms entre frames; con la rejilla, todos los
+intervalos son idénticos y la duración se conserva. Como efecto secundario, el
+total de frames pasa a ser exacto en vez de estimado.
 
 ### Capturas para motores de video por IA
 

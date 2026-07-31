@@ -103,9 +103,9 @@ export default function Home() {
         setDownload(msg.total ? msg.loaded / msg.total : 0);
       } else if (msg.type === "frame") {
         setProgress(msg.progress);
-        // The total is derived from duration x frame rate, so it is close but
-        // not exact — hence the tilde.
-        setStatus(`Frame ${msg.frameIndex} de ~${msg.totalFrames}`);
+        // The grid makes the frame total exact.
+
+        setStatus(`Frame ${msg.frameIndex} de ${msg.totalFrames}`);
         if (msg.preview) {
           const canvas = previewRef.current;
           if (canvas) {

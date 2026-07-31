@@ -187,40 +187,43 @@ type Attempt = {
  * before it is written off — the difference between an MP4 and a VP8 WebM.
  */
 function attemptsFor(codec: VideoCodec): Attempt[] {
-  const base: Attempt[] = [{ codec, label: `${codec}`, options: {} }];
+  const attempts: Attempt[] = [{ codec, label: codec, options: {} }];
 
-  // WebKit's hardware H.264 encoder is known to refuse the default 'quality'
-  // latency mode in some versions, so try 'realtime' early rather than last.
-  if (codec === "avc" || codec === "hevc") {
-    base.push({
-      codec,
-      label: `${codec}/realtime`,
-      options: { latencyMode: "realtime" },
-    });
-  }
-
+  // Profiles first: an encoder may reject the default High profile while
+  // accepting Main or Baseline.
   if (codec === "avc") {
-    base.push(
+    attempts.push(
       { codec, label: "avc/main-4.0", options: { fullCodecString: "avc1.4d0028" } },
-      {
-        codec,
-        label: "avc/main-4.0+realtime",
-        options: { fullCodecString: "avc1.4d0028", latencyMode: "realtime" },
-      },
       { codec, label: "avc/baseline-4.0", options: { fullCodecString: "avc1.420028" } },
       { codec, label: "avc/baseline-3.1", options: { fullCodecString: "avc1.42001f" } },
       { codec, label: "avc/high-4.0", options: { fullCodecString: "avc1.640028" } },
     );
   }
 
-  // Software encoding is slower but available where hardware paths are not.
-  base.push({
+  // Realtime last among the hardware attempts: WebKit's H.264 encoder refuses
+  // the default 'quality' mode in some versions, but realtime is allowed to
+  // drop frames when the encoder falls behind, which shows up as stutter. Only
+  // worth it when nothing else works.
+  if (codec === "avc" || codec === "hevc") {
+    attempts.push(
+      { codec, label: `${codec}/realtime`, options: { latencyMode: "realtime" } },
+    );
+  }
+  if (codec === "avc") {
+    attempts.push({
+      codec,
+      label: "avc/main-4.0+realtime",
+      options: { fullCodecString: "avc1.4d0028", latencyMode: "realtime" },
+    });
+  }
+
+  attempts.push({
     codec,
     label: `${codec}/software`,
     options: { hardwareAcceleration: "prefer-software" },
   });
 
-  return base;
+  return attempts;
 }
 
 /**
@@ -347,7 +350,16 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   // estimate, but `packetCount` is that sample size, not the real total.
   const stats = await track.computePacketStats(60);
   const fps = stats.averagePacketRate || 30;
-  const estimatedFrames = Math.max(1, Math.round(duration * fps));
+  // Phone cameras record at a variable frame rate, dropping to ~24fps in low
+  // light and back up again. Copying those timestamps through reproduces the
+  // unevenness, and it reads as micro-stutter on a depth map, where there is no
+  // motion blur or texture to hide it. Resampling onto a fixed grid fixes it.
+  const targetFps = Math.min(60, Math.max(1, Math.round(fps)));
+  const frameCount = Math.max(1, Math.round(duration * targetFps));
+  const frameStep = 1 / targetFps;
+
+  const sampleTimes: number[] = [];
+  for (let i = 0; i < frameCount; i++) sampleTimes.push(start + i * frameStep);
 
   // Side-by-side doubles the width, so halve the budget to stay within
   // typical hardware encoder limits.
@@ -403,7 +415,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     ...codecOptions,
   });
   setPhase("apertura del codificador");
-  output.addVideoTrack(source, { frameRate: fps });
+  output.addVideoTrack(source, { frameRate: targetFps });
   await output.start();
 
   post({
@@ -421,20 +433,26 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const alpha = 0.85;
 
   let frameIndex = 0;
-  let lastEnd = 0;
 
-  for await (const {
-    canvas,
-    timestamp,
-    duration: frameDuration,
-  } of sink.canvases(start, end)) {
+  for await (const wrapped of sink.canvasesAtTimestamps(sampleTimes)) {
     if (canceled) {
       await output.cancel();
       return;
     }
 
+    // A grid point before the first decoded frame yields null. Once frames are
+    // flowing, a null means the source had nothing new to show at that instant,
+    // so the previous output frame is held — which is what the source did too.
+    if (!wrapped) {
+      if (frameIndex === 0) continue;
+      setPhase(`repetición del frame ${frameIndex + 1}`);
+      await source.add(frameIndex * frameStep, frameStep);
+      frameIndex++;
+      continue;
+    }
+
     setPhase(`decodificación del frame ${frameIndex + 1}`);
-    infCtx.drawImage(canvas, 0, 0, infSize.width, infSize.height);
+    infCtx.drawImage(wrapped.canvas, 0, 0, infSize.width, infSize.height);
     setPhase(`inferencia del frame ${frameIndex + 1}`);
     const { predicted_depth } = await estimator(RawImage.fromCanvas(infCanvas));
     const depth = predicted_depth.data as Float32Array;
@@ -485,7 +503,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     depthCtx.putImageData(depthImage, 0, 0);
 
     if (colorMode === "sideBySide") {
-      outCtx.drawImage(canvas, 0, 0, frameSize.width, frameSize.height);
+      outCtx.drawImage(wrapped.canvas, 0, 0, frameSize.width, frameSize.height);
       outCtx.drawImage(
         depthCanvas,
         frameSize.width,
@@ -502,18 +520,10 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     // Phone recordings are frequently variable frame rate, and the last frame
     // of a clip can report a zero or missing duration. Feeding that to the
     // encoder throws an opaque error, so fall back to the average frame time.
-    // Rebased to the start of the selection, otherwise a clip trimmed from
-    // the middle would begin with a gap the length of everything skipped.
-    const rebased = timestamp - start;
-    const safeTimestamp =
-      Number.isFinite(rebased) && rebased >= 0 ? rebased : lastEnd;
-    const safeDuration =
-      Number.isFinite(frameDuration) && frameDuration > 0
-        ? frameDuration
-        : 1 / fps;
-
-    await source.add(safeTimestamp, safeDuration);
-    lastEnd = safeTimestamp + safeDuration;
+    // Output timing comes from the grid, never from the source, so the result
+    // is constant frame rate and starts at zero regardless of where the trim
+    // began.
+    await source.add(frameIndex * frameStep, frameStep);
 
     frameIndex++;
 
@@ -548,9 +558,9 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
       type: "frame",
       // Timestamps are exact, so progress reflects the real position in the
       // clip instead of a guessed frame total.
-      progress: Math.min(1, Math.max(0, lastEnd / duration)),
+      progress: Math.min(1, frameIndex / frameCount),
       frameIndex,
-      totalFrames: Math.max(estimatedFrames, frameIndex),
+      totalFrames: frameCount,
       preview,
     };
 
