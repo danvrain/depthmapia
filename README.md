@@ -86,13 +86,20 @@ backend después sin cambiar de proveedor.
 
 ## Requisitos del navegador
 
-| | Mínimo | Recomendado |
-|---|---|---|
-| Inferencia | WASM (CPU) | WebGPU |
-| Codificación | WebCodecs | WebCodecs con H.264 |
+Pensada para **escritorio**. Al cargar la página se comprueban las capacidades
+del navegador y se avisa antes de descargar nada:
 
-Chrome y Edge actualizados dan la mejor experiencia. Si WebGPU no está
-disponible, la app cae automáticamente a CPU (más lento). Si el navegador no
+| Navegador | Resultado |
+|---|---|
+| Chrome / Edge actualizados | Funciona con WebGPU (rápido) |
+| Safari 26+ (macOS, iOS, iPadOS) | Funciona con WebGPU (rápido) |
+| Safari 16.4 – 18 | Funciona, pero en CPU (lento) |
+| Safari ≤ 16.3 | Bloqueado — sin WebCodecs |
+| Móviles y tablets | Aviso: puede tardar mucho o quedarse sin memoria |
+
+Requisitos duros: `WebCodecs` y `OffscreenCanvas`. Si falta alguno la app se
+bloquea con un mensaje claro en vez de fallar a mitad del proceso. WebGPU es
+opcional — sin él se usa WASM sobre CPU, bastante más lento. Si el navegador no
 puede codificar H.264, se usa VP9 dentro del mismo contenedor MP4.
 
 ## Estructura

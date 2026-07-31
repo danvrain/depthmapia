@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { CompatBanner } from "@/components/CompatBanner";
 import { Dropzone } from "@/components/Dropzone";
+import { detectCapabilities, type Capabilities } from "@/lib/capabilities";
 import {
   DEFAULT_MODEL,
   MAX_DURATION_SECONDS,
@@ -37,6 +39,7 @@ export default function Home() {
   const workerRef = useRef<Worker | null>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
 
+  const [caps, setCaps] = useState<Capabilities | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
@@ -52,6 +55,11 @@ export default function Home() {
   const [invert, setInvert] = useState(false);
 
   const busy = stage === "loadingModel" || stage === "processing" || stage === "encoding";
+  const blocked = caps !== null && !caps.supported;
+
+  useEffect(() => {
+    detectCapabilities().then(setCaps);
+  }, []);
 
   useEffect(() => {
     const worker = new Worker(
@@ -176,7 +184,13 @@ export default function Home() {
         </p>
       </header>
 
-      <Dropzone onFile={handleFile} disabled={busy} maxBytes={MAX_FILE_BYTES} />
+      <CompatBanner caps={caps} />
+
+      <Dropzone
+        onFile={handleFile}
+        disabled={busy || blocked}
+        maxBytes={MAX_FILE_BYTES}
+      />
 
       {file && (
         <p className="text-sm text-white/60">
@@ -265,7 +279,7 @@ export default function Home() {
         <button
           type="button"
           onClick={start}
-          disabled={!file || busy}
+          disabled={!file || busy || blocked}
           className="rounded-xl bg-[var(--color-accent)] px-5 py-3 font-medium text-[#04070f] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? "Procesando…" : "Generar mapa de profundidad"}
