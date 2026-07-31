@@ -1,0 +1,35 @@
+{
+	admin off
+	# Railway terminates TLS at the edge, so Caddy serves plain HTTP internally.
+	auto_https off
+	persist_config off
+}
+
+:{$PORT:8080} {
+	root * /srv
+	encode zstd gzip
+
+	header {
+		# These two unlock SharedArrayBuffer, which lets onnxruntime-web run
+		# multi-threaded WASM — a large speedup when WebGPU is unavailable.
+		# `credentialless` rather than `require-corp` so the model weights can
+		# still be fetched from the Hugging Face CDN.
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "credentialless"
+
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Hashed build assets never change under the same name.
+	header /_next/static/* Cache-Control "public, max-age=31536000, immutable"
+
+	handle_errors {
+		rewrite * /404.html
+		file_server
+	}
+
+	try_files {path} {path}/index.html {path}.html
+	file_server
+}

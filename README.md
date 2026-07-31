@@ -50,6 +50,40 @@ npm run build    # genera ./out
 > servirlos desde tu propio dominio, define `env.remoteHost` en
 > `workers/depth.worker.ts`.
 
+### Cabeceras recomendadas en cPanel
+
+Sin las cabeceras COOP/COEP el navegador no puede usar `SharedArrayBuffer`, y
+onnxruntime-web cae a WASM de un solo hilo (bastante más lento cuando no hay
+WebGPU). Crea un `.htaccess` dentro de `public_html/`:
+
+```apache
+<IfModule mod_headers.c>
+  Header set Cross-Origin-Opener-Policy "same-origin"
+  Header set Cross-Origin-Embedder-Policy "credentialless"
+</IfModule>
+```
+
+`credentialless` en vez de `require-corp` es importante: permite seguir
+descargando los pesos del modelo desde el CDN de Hugging Face.
+
+## Desplegar en Railway
+
+El repo incluye `Dockerfile`, `Caddyfile` y `railway.json`. Railway detecta el
+Dockerfile y sirve el export estático con Caddy, ya con las cabeceras COOP/COEP
+configuradas.
+
+```bash
+railway init
+railway up
+```
+
+O conecta el repo desde el dashboard de Railway y despliega en cada push.
+
+Railway **no ofrece GPU** fuera del plan Enterprise, así que la inferencia sigue
+corriendo en el navegador igual que en cPanel — Railway solo actúa como host.
+La ventaja sobre cPanel es el deploy automático desde git y poder añadir un
+backend después sin cambiar de proveedor.
+
 ## Requisitos del navegador
 
 | | Mínimo | Recomendado |
