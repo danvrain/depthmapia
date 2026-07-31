@@ -189,9 +189,24 @@ type Attempt = {
 function attemptsFor(codec: VideoCodec): Attempt[] {
   const base: Attempt[] = [{ codec, label: `${codec}`, options: {} }];
 
+  // WebKit's hardware H.264 encoder is known to refuse the default 'quality'
+  // latency mode in some versions, so try 'realtime' early rather than last.
+  if (codec === "avc" || codec === "hevc") {
+    base.push({
+      codec,
+      label: `${codec}/realtime`,
+      options: { latencyMode: "realtime" },
+    });
+  }
+
   if (codec === "avc") {
     base.push(
       { codec, label: "avc/main-4.0", options: { fullCodecString: "avc1.4d0028" } },
+      {
+        codec,
+        label: "avc/main-4.0+realtime",
+        options: { fullCodecString: "avc1.4d0028", latencyMode: "realtime" },
+      },
       { codec, label: "avc/baseline-4.0", options: { fullCodecString: "avc1.420028" } },
       { codec, label: "avc/baseline-3.1", options: { fullCodecString: "avc1.42001f" } },
       { codec, label: "avc/high-4.0", options: { fullCodecString: "avc1.640028" } },
