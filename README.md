@@ -120,8 +120,18 @@ del navegador y se avisa antes de descargar nada:
 
 Requisitos duros: `WebCodecs` y `OffscreenCanvas`. Si falta alguno la app se
 bloquea con un mensaje claro en vez de fallar a mitad del proceso. WebGPU es
-opcional — sin él se usa WASM sobre CPU, bastante más lento. Si el navegador no
-puede codificar H.264, se usa VP9 dentro del mismo contenedor MP4.
+opcional — sin él se usa WASM sobre CPU, bastante más lento.
+
+### Contenedor de salida
+
+El códec se elige codificando un frame de prueba con cada candidato y quedándose
+con el primero que sobrevive al vaciado del codificador — `isConfigSupported` no
+es de fiar. El orden es H.264, HEVC, AV1, VP9 y por último VP8.
+
+Los cuatro primeros van en MP4. VP8 solo se usa si ningún otro funciona, y en ese
+caso la salida es WebM: VP8 dentro de un MP4 produce un archivo que la mayoría de
+reproductores no abre. La UI indica siempre el contenedor y el códec obtenidos, y
+la consola registra cuáles se descartaron y por qué.
 
 ## Estructura
 

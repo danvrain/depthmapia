@@ -38,7 +38,14 @@ export type WorkerResponse =
       type: "still";
       blob: Blob;
     }
-  | { type: "done"; buffer: ArrayBuffer; mimeType: string; extension: string }
+  | {
+      type: "done";
+      buffer: ArrayBuffer;
+      mimeType: string;
+      extension: string;
+      /** Which encoder actually produced the file, surfaced in the UI. */
+      codec: string;
+    }
   | { type: "error"; message: string };
 
 export type Stage =

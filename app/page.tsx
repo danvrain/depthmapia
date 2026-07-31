@@ -24,7 +24,20 @@ import type {
   WorkerResponse,
 } from "@/lib/types";
 
-type Result = { url: string; extension: string; bytes: number };
+type Result = {
+  url: string;
+  extension: string;
+  bytes: number;
+  codec: string;
+};
+
+const CODEC_LABELS: Record<string, string> = {
+  avc: "H.264",
+  hevc: "HEVC / H.265",
+  av1: "AV1",
+  vp9: "VP9",
+  vp8: "VP8",
+};
 
 /** Reads duration client-side so oversized clips are rejected before any download. */
 function readDuration(file: File): Promise<number> {
@@ -112,6 +125,7 @@ export default function Home() {
           url: URL.createObjectURL(blob),
           extension: msg.extension,
           bytes: blob.size,
+          codec: msg.codec,
         });
         setProgress(1);
         setStage("done");
@@ -397,13 +411,28 @@ export default function Home() {
           )}
 
           {result && (
-            <a
-              href={result.url}
-              download={`${baseName(file?.name ?? "video")}-depthmap.${result.extension}`}
-              className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-medium text-[#04120c] transition hover:brightness-110"
-            >
-              Descargar video ({formatBytes(result.bytes)})
-            </a>
+            <>
+              <a
+                href={result.url}
+                download={`${baseName(file?.name ?? "video")}-depthmap.${result.extension}`}
+                className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-medium text-[#04120c] transition hover:brightness-110"
+              >
+                Descargar {result.extension.toUpperCase()} (
+                {formatBytes(result.bytes)})
+              </a>
+              <p className="text-center text-xs text-white/45">
+                {result.extension === "mp4" ? "MP4" : "WebM"} ·{" "}
+                {CODEC_LABELS[result.codec] ?? result.codec}
+              </p>
+              {result.extension !== "mp4" && (
+                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100/90">
+                  Tu navegador solo pudo codificar {CODEC_LABELS[result.codec] ?? result.codec},
+                  que no funciona bien dentro de un MP4. Renombrar el archivo no
+                  lo arreglaría: haría falta recodificar a H.264, y este
+                  navegador no puede. En Chrome o Edge deberías obtener un MP4.
+                </p>
+              )}
+            </>
           )}
         </section>
       )}

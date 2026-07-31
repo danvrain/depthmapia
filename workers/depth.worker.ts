@@ -210,7 +210,13 @@ async function pickWorkingCodec(
       output.addVideoTrack(source, { frameRate: 30 });
       await output.start();
       await source.add(0, 1 / 30);
-      await output.cancel();
+      // finalize() flushes the encoder. cancel() abandons it, which hides
+      // failures that only surface when the last packets are drained.
+      await output.finalize();
+      console.info(
+        `[DepthMapIA] códec elegido: ${codec} (${useMp4 ? "MP4" : "WebM"})`,
+        failures.length ? { descartados: failures } : "",
+      );
       return { codec, useMp4 };
     } catch (err) {
       failures.push(`${codec}: ${err instanceof Error ? err.message : err}`);
@@ -500,6 +506,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
       buffer,
       mimeType: useMp4 ? "video/mp4" : "video/webm",
       extension: useMp4 ? "mp4" : "webm",
+      codec,
     },
     [buffer],
   );
