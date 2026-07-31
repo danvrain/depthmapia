@@ -45,6 +45,9 @@ export type WorkerResponse =
       extension: string;
       /** Which encoder actually produced the file, surfaced in the UI. */
       codec: string;
+      /** Every configuration the probe rejected, with the reason. Shown in the
+       *  UI rather than only logged, since opening a console is a real hurdle. */
+      codecFailures: string[];
     }
   | { type: "error"; message: string };
 

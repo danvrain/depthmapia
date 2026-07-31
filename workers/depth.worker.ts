@@ -222,6 +222,7 @@ async function pickWorkingCodec(
   codec: VideoCodec;
   useMp4: boolean;
   options: VideoEncodingAdditionalOptions;
+  failures: string[];
 }> {
   const advertised = await getFirstEncodableVideoCodec(
     ["avc", "hevc", "av1", "vp9", "vp8"] as VideoCodec[],
@@ -263,7 +264,7 @@ async function pickWorkingCodec(
         `[DepthMapIA] códec elegido: ${label} (${useMp4 ? "MP4" : "WebM"})`,
         failures.length ? { descartados: failures } : "",
       );
-      return { codec, useMp4, options };
+      return { codec, useMp4, options, failures };
     } catch (err) {
       failures.push(`${label}: ${err instanceof Error ? err.message : err}`);
       try {
@@ -372,6 +373,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     codec,
     useMp4,
     options: codecOptions,
+    failures: codecFailures,
   } = await pickWorkingCodec(canvasWidth, canvasHeight);
 
   const output = new Output({
@@ -558,6 +560,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
       mimeType: useMp4 ? "video/mp4" : "video/webm",
       extension: useMp4 ? "mp4" : "webm",
       codec,
+      codecFailures,
     },
     [buffer],
   );

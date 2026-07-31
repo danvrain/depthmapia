@@ -29,6 +29,7 @@ type Result = {
   extension: string;
   bytes: number;
   codec: string;
+  codecFailures: string[];
 };
 
 const CODEC_LABELS: Record<string, string> = {
@@ -126,6 +127,7 @@ export default function Home() {
           extension: msg.extension,
           bytes: blob.size,
           codec: msg.codec,
+          codecFailures: msg.codecFailures,
         });
         setProgress(1);
         setStage("done");
@@ -425,12 +427,30 @@ export default function Home() {
                 {CODEC_LABELS[result.codec] ?? result.codec}
               </p>
               {result.extension !== "mp4" && (
-                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100/90">
-                  Tu navegador solo pudo codificar {CODEC_LABELS[result.codec] ?? result.codec},
-                  que no funciona bien dentro de un MP4. Renombrar el archivo no
-                  lo arreglaría: haría falta recodificar a H.264, y este
-                  navegador no puede. En Chrome o Edge deberías obtener un MP4.
-                </p>
+                <div className="flex flex-col gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100/90">
+                  <p>
+                    Tu navegador solo pudo codificar{" "}
+                    {CODEC_LABELS[result.codec] ?? result.codec}, que no funciona
+                    bien dentro de un MP4. Renombrar el archivo no lo arreglaría:
+                    haría falta recodificar a H.264, y este navegador no puede.
+                    En Chrome o Edge deberías obtener un MP4.
+                  </p>
+                  {result.codecFailures.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer select-none text-amber-100/70">
+                        Ver por qué se descartó cada códec (
+                        {result.codecFailures.length})
+                      </summary>
+                      <ul className="mt-2 flex flex-col gap-1 font-mono text-[11px] text-amber-100/70">
+                        {result.codecFailures.map((f, i) => (
+                          <li key={i} className="break-words">
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
               )}
             </>
           )}
