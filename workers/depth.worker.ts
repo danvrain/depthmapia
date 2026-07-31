@@ -443,6 +443,20 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
 
     frameIndex++;
 
+    // The opening depth frame doubles as a still for image-to-video models,
+    // so publish it right away rather than at the end of the run.
+    if (frameIndex === 1) {
+      try {
+        const still = new OffscreenCanvas(frameSize.width, frameSize.height);
+        still
+          .getContext("2d")!
+          .drawImage(depthCanvas, 0, 0, frameSize.width, frameSize.height);
+        post({ type: "still", blob: await still.convertToBlob({ type: "image/png" }) });
+      } catch {
+        /* the still is a bonus; never let it stop the run */
+      }
+    }
+
     // The frame is already encoded at this point, so it is safe to transfer
     // the canvas contents away for the live preview. The preview is purely
     // cosmetic, so never let it abort a run that is otherwise fine — not every

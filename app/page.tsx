@@ -6,6 +6,7 @@ import { CompatBanner } from "@/components/CompatBanner";
 import { Dropzone } from "@/components/Dropzone";
 import { TrimBar } from "@/components/TrimBar";
 import { detectCapabilities, type Capabilities } from "@/lib/capabilities";
+import { baseName, downloadBlob } from "@/lib/download";
 import {
   DEFAULT_MODEL,
   MAX_CLIP_SECONDS,
@@ -57,6 +58,7 @@ export default function Home() {
   const [download, setDownload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [still, setStill] = useState<{ blob: Blob; url: string } | null>(null);
 
   const [model, setModel] = useState<ModelKey>(DEFAULT_MODEL);
   const [colorMode, setColorMode] = useState<ColorMode>("grayscale");
@@ -99,6 +101,11 @@ export default function Home() {
           }
           msg.preview.close();
         }
+      } else if (msg.type === "still") {
+        setStill((prev) => {
+          if (prev) URL.revokeObjectURL(prev.url);
+          return { blob: msg.blob, url: URL.createObjectURL(msg.blob) };
+        });
       } else if (msg.type === "done") {
         const blob = new Blob([msg.buffer], { type: msg.mimeType });
         setResult({
@@ -120,6 +127,10 @@ export default function Home() {
 
   const reset = useCallback(() => {
     setResult((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+    setStill((prev) => {
       if (prev) URL.revokeObjectURL(prev.url);
       return null;
     });
@@ -352,14 +363,49 @@ export default function Home() {
         </section>
       )}
 
-      {result && (
-        <a
-          href={result.url}
-          download={`depthmap-${file?.name?.replace(/\.[^.]+$/, "") ?? "video"}.${result.extension}`}
-          className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-medium text-[#04120c] transition hover:brightness-110"
-        >
-          Descargar video ({formatBytes(result.bytes)})
-        </a>
+      {(result || still) && (
+        <section className="flex flex-col gap-4 rounded-2xl border border-[var(--color-edge)] bg-[var(--color-panel)]/60 p-5">
+          {still && (
+            <div className="flex items-center gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={still.url}
+                alt="Primer frame del mapa de profundidad"
+                className="h-20 w-auto rounded-lg border border-[var(--color-edge)] bg-black"
+              />
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-white/80">
+                  Primer frame en profundidad
+                </p>
+                <p className="text-xs text-white/50">
+                  El still inicial, para motores de video por IA.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  downloadBlob(
+                    still.blob,
+                    `${baseName(file?.name ?? "video")}-depth-frame.png`,
+                  )
+                }
+                className="ml-auto shrink-0 rounded-lg border border-[var(--color-edge)] px-3 py-2 text-sm text-white/80 transition hover:border-white/30"
+              >
+                Descargar PNG
+              </button>
+            </div>
+          )}
+
+          {result && (
+            <a
+              href={result.url}
+              download={`${baseName(file?.name ?? "video")}-depthmap.${result.extension}`}
+              className="rounded-xl bg-emerald-400 px-5 py-3 text-center font-medium text-[#04120c] transition hover:brightness-110"
+            >
+              Descargar video ({formatBytes(result.bytes)})
+            </a>
+          )}
+        </section>
       )}
 
       <footer className="mt-6 text-xs text-white/35">

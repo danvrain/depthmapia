@@ -32,6 +32,12 @@ export type WorkerResponse =
       /** Preview of the current depth frame. */
       preview?: ImageBitmap;
     }
+  | {
+      /** First depth frame, emitted as soon as it exists so it can be grabbed
+       *  without waiting for the whole clip to finish. */
+      type: "still";
+      blob: Blob;
+    }
   | { type: "done"; buffer: ArrayBuffer; mimeType: string; extension: string }
   | { type: "error"; message: string };
 

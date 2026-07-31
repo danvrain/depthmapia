@@ -29,6 +29,16 @@ Solo se decodifica el tramo seleccionado — no se recorta ni se re-codifica el
 archivo de entrada — y los timestamps se rebasan a cero para que el resultado no
 arranque con un hueco.
 
+### Capturas para motores de video por IA
+
+Dos formas de sacar un still, pensadas para alimentar modelos image-to-video:
+
+- **Capturar frame (PNG)** en el editor: exporta el frame donde esté la línea
+  blanca, a la resolución original del video (mayor que la del procesado). El
+  nombre incluye el segundo, p. ej. `clip-frame-6s00.png`.
+- **Primer frame en profundidad**: se publica en cuanto existe, sin esperar a
+  que termine el clip, para flujos condicionados por profundidad.
+
 ### Opciones disponibles
 
 - **Modelos**: Depth Anything V2 Small (por defecto), V2 Base y V1 Small.

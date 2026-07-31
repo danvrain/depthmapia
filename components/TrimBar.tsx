@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MAX_CLIP_SECONDS, MIN_CLIP_SECONDS } from "@/lib/constants";
+import { baseName, downloadBlob, timeTag } from "@/lib/download";
 import type { Range } from "@/lib/types";
 
 const THUMB_COUNT = 12;
@@ -92,6 +93,18 @@ export function TrimBar({
   range.current = value;
 
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
+  // Park the video on the first frame of the selection, so the preview and any
+  // captured still match what the run will actually start from.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onReady = () => {
+      video.currentTime = range.current.start;
+    };
+    video.addEventListener("loadeddata", onReady);
+    return () => video.removeEventListener("loadeddata", onReady);
+  }, [url]);
 
   useEffect(() => {
     const signal = { canceled: false };
@@ -204,6 +217,36 @@ export function TrimBar({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [playing]);
+
+  /**
+   * Exports the frame under the playhead at the video's native resolution,
+   * which is higher than the processed output and is what image-to-video
+   * models want as a starting still.
+   */
+  const [capturing, setCapturing] = useState(false);
+  const captureFrame = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+
+    setCapturing(true);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d")!.drawImage(video, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          downloadBlob(
+            blob,
+            `${baseName(file.name)}-frame-${timeTag(video.currentTime)}.png`,
+          );
+        }
+        setCapturing(false);
+      }, "image/png");
+    } catch {
+      setCapturing(false);
+    }
+  };
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -318,6 +361,15 @@ export function TrimBar({
           className="rounded-lg border border-[var(--color-edge)] px-3 py-1.5 text-white/80 transition hover:border-white/30 disabled:opacity-40"
         >
           {playing ? "Pausar" : "Reproducir selección"}
+        </button>
+        <button
+          type="button"
+          onClick={captureFrame}
+          disabled={disabled || capturing}
+          title="Guarda el frame donde está la línea blanca, en PNG y a resolución original"
+          className="rounded-lg border border-[var(--color-edge)] px-3 py-1.5 text-white/80 transition hover:border-white/30 disabled:opacity-40"
+        >
+          {capturing ? "Guardando…" : "Capturar frame (PNG)"}
         </button>
         <span>Inicio {formatTime(value.start)}</span>
         <span>Fin {formatTime(value.end)}</span>
