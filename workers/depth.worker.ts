@@ -14,6 +14,7 @@ import {
   CanvasSource,
   Input,
   Mp4OutputFormat,
+  NullTarget,
   Output,
   QUALITY_HIGH,
   WebMOutputFormat,
@@ -166,6 +167,66 @@ function fitWithin(
   return { width: even(width * scale), height: even(height * scale) };
 }
 
+/** MP4 can carry these; anything else goes into WebM. */
+const MP4_CODECS = new Set<VideoCodec>(["avc", "hevc", "av1", "vp9"]);
+
+/**
+ * Picks a codec by actually encoding a throwaway frame with it.
+ *
+ * `VideoEncoder.isConfigSupported` is optimistic in Safari: it reports codecs
+ * as supported that then throw a bare "Type error" the moment the encoder is
+ * really configured. Probing costs one frame and tells the truth.
+ */
+async function pickWorkingCodec(
+  width: number,
+  height: number,
+): Promise<{ codec: VideoCodec; useMp4: boolean }> {
+  const advertised = await getFirstEncodableVideoCodec(
+    ["avc", "hevc", "av1", "vp9", "vp8"] as VideoCodec[],
+    { width, height },
+  );
+
+  // Try what the browser advertises first, then everything else.
+  const candidates = [
+    ...(advertised ? [advertised] : []),
+    ...(["avc", "hevc", "av1", "vp9", "vp8"] as VideoCodec[]),
+  ].filter((c, i, all) => all.indexOf(c) === i);
+
+  const probe = new OffscreenCanvas(width, height);
+  probe.getContext("2d")!.fillRect(0, 0, width, height);
+
+  const failures: string[] = [];
+
+  for (const codec of candidates) {
+    const useMp4 = MP4_CODECS.has(codec);
+    let output: Output | null = null;
+    try {
+      output = new Output({
+        format: useMp4 ? new Mp4OutputFormat() : new WebMOutputFormat(),
+        target: new NullTarget(),
+      });
+      const source = new CanvasSource(probe, { codec, quality: QUALITY_HIGH });
+      output.addVideoTrack(source, { frameRate: 30 });
+      await output.start();
+      await source.add(0, 1 / 30);
+      await output.cancel();
+      return { codec, useMp4 };
+    } catch (err) {
+      failures.push(`${codec}: ${err instanceof Error ? err.message : err}`);
+      try {
+        await output?.cancel();
+      } catch {
+        /* the probe already failed; nothing to clean up */
+      }
+    }
+  }
+
+  console.error("[DepthMapIA] ningún códec pudo codificar:", failures);
+  throw new Error(
+    `Tu navegador no pudo codificar video a ${width}x${height}. Probé ${candidates.join(", ")} y ninguno funcionó.`,
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Main routine                                                               */
 /* -------------------------------------------------------------------------- */
@@ -240,17 +301,8 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const outCtx = outCanvas.getContext("2d")!;
 
   setPhase("selección de códec");
-  const codec = await getFirstEncodableVideoCodec(
-    ["avc", "vp9", "av1", "vp8"] as VideoCodec[],
-    { width: canvasWidth, height: canvasHeight },
-  );
-  if (!codec) {
-    throw new Error(
-      "Tu navegador no puede codificar video. Prueba con Chrome o Edge actualizado.",
-    );
-  }
+  const { codec, useMp4 } = await pickWorkingCodec(canvasWidth, canvasHeight);
 
-  const useMp4 = codec === "avc" || codec === "av1" || codec === "vp9";
   const output = new Output({
     format: useMp4 ? new Mp4OutputFormat() : new WebMOutputFormat(),
     target: new BufferTarget(),
@@ -280,6 +332,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const alpha = 0.85;
 
   let frameIndex = 0;
+  let lastEnd = 0;
 
   for await (const { canvas, timestamp, duration: frameDuration } of sink.canvases()) {
     if (canceled) {
@@ -352,7 +405,18 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     }
 
     setPhase(`codificación del frame ${frameIndex + 1}`);
-    await source.add(timestamp, frameDuration);
+
+    // Phone recordings are frequently variable frame rate, and the last frame
+    // of a clip can report a zero or missing duration. Feeding that to the
+    // encoder throws an opaque error, so fall back to the average frame time.
+    const safeTimestamp = Number.isFinite(timestamp) && timestamp >= 0 ? timestamp : lastEnd;
+    const safeDuration =
+      Number.isFinite(frameDuration) && frameDuration > 0
+        ? frameDuration
+        : 1 / fps;
+
+    await source.add(safeTimestamp, safeDuration);
+    lastEnd = safeTimestamp + safeDuration;
 
     frameIndex++;
 
