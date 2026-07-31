@@ -20,6 +20,7 @@ import {
   WebMOutputFormat,
   getFirstEncodableVideoCodec,
   type VideoCodec,
+  type VideoEncodingAdditionalOptions,
 } from "mediabunny";
 
 import {
@@ -171,6 +172,42 @@ function fitWithin(
 /** MP4 can carry these; anything else goes into WebM. */
 const MP4_CODECS = new Set<VideoCodec>(["avc", "hevc", "av1", "vp9"]);
 
+type Attempt = {
+  codec: VideoCodec;
+  label: string;
+  options: VideoEncodingAdditionalOptions;
+};
+
+/**
+ * Configurations to try for a codec, in descending order of preference.
+ *
+ * A codec being available does not mean every profile of it is. Encoders
+ * commonly reject the High profile that gets picked by default while happily
+ * accepting Main or Baseline, so H.264 gets several explicit profile strings
+ * before it is written off — the difference between an MP4 and a VP8 WebM.
+ */
+function attemptsFor(codec: VideoCodec): Attempt[] {
+  const base: Attempt[] = [{ codec, label: `${codec}`, options: {} }];
+
+  if (codec === "avc") {
+    base.push(
+      { codec, label: "avc/main-4.0", options: { fullCodecString: "avc1.4d0028" } },
+      { codec, label: "avc/baseline-4.0", options: { fullCodecString: "avc1.420028" } },
+      { codec, label: "avc/baseline-3.1", options: { fullCodecString: "avc1.42001f" } },
+      { codec, label: "avc/high-4.0", options: { fullCodecString: "avc1.640028" } },
+    );
+  }
+
+  // Software encoding is slower but available where hardware paths are not.
+  base.push({
+    codec,
+    label: `${codec}/software`,
+    options: { hardwareAcceleration: "prefer-software" },
+  });
+
+  return base;
+}
+
 /**
  * Picks a codec by actually encoding a throwaway frame with it.
  *
@@ -181,7 +218,11 @@ const MP4_CODECS = new Set<VideoCodec>(["avc", "hevc", "av1", "vp9"]);
 async function pickWorkingCodec(
   width: number,
   height: number,
-): Promise<{ codec: VideoCodec; useMp4: boolean }> {
+): Promise<{
+  codec: VideoCodec;
+  useMp4: boolean;
+  options: VideoEncodingAdditionalOptions;
+}> {
   const advertised = await getFirstEncodableVideoCodec(
     ["avc", "hevc", "av1", "vp9", "vp8"] as VideoCodec[],
     { width, height },
@@ -198,7 +239,8 @@ async function pickWorkingCodec(
 
   const failures: string[] = [];
 
-  for (const codec of candidates) {
+  for (const attempt of candidates.flatMap(attemptsFor)) {
+    const { codec, label, options } = attempt;
     const useMp4 = MP4_CODECS.has(codec);
     let output: Output | null = null;
     try {
@@ -206,7 +248,11 @@ async function pickWorkingCodec(
         format: useMp4 ? new Mp4OutputFormat() : new WebMOutputFormat(),
         target: new NullTarget(),
       });
-      const source = new CanvasSource(probe, { codec, quality: QUALITY_HIGH });
+      const source = new CanvasSource(probe, {
+        codec,
+        quality: QUALITY_HIGH,
+        ...options,
+      });
       output.addVideoTrack(source, { frameRate: 30 });
       await output.start();
       await source.add(0, 1 / 30);
@@ -214,12 +260,12 @@ async function pickWorkingCodec(
       // failures that only surface when the last packets are drained.
       await output.finalize();
       console.info(
-        `[DepthMapIA] códec elegido: ${codec} (${useMp4 ? "MP4" : "WebM"})`,
+        `[DepthMapIA] códec elegido: ${label} (${useMp4 ? "MP4" : "WebM"})`,
         failures.length ? { descartados: failures } : "",
       );
-      return { codec, useMp4 };
+      return { codec, useMp4, options };
     } catch (err) {
-      failures.push(`${codec}: ${err instanceof Error ? err.message : err}`);
+      failures.push(`${label}: ${err instanceof Error ? err.message : err}`);
       try {
         await output?.cancel();
       } catch {
@@ -322,7 +368,11 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   const outCtx = outCanvas.getContext("2d")!;
 
   setPhase("selección de códec");
-  const { codec, useMp4 } = await pickWorkingCodec(canvasWidth, canvasHeight);
+  const {
+    codec,
+    useMp4,
+    options: codecOptions,
+  } = await pickWorkingCodec(canvasWidth, canvasHeight);
 
   const output = new Output({
     format: useMp4 ? new Mp4OutputFormat() : new WebMOutputFormat(),
@@ -333,6 +383,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     codec,
     quality: QUALITY_HIGH,
     keyFrameInterval: 1,
+    ...codecOptions,
   });
   setPhase("apertura del codificador");
   output.addVideoTrack(source, { frameRate: fps });

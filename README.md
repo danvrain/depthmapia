@@ -128,6 +128,12 @@ El códec se elige codificando un frame de prueba con cada candidato y quedándo
 con el primero que sobrevive al vaciado del codificador — `isConfigSupported` no
 es de fiar. El orden es H.264, HEVC, AV1, VP9 y por último VP8.
 
+Que un códec esté disponible no implica que lo estén todos sus perfiles: hay
+codificadores que rechazan el perfil High que se elige por defecto pero aceptan
+Main o Baseline. Por eso H.264 se prueba con varios `fullCodecString` explícitos
+y con `prefer-software` antes de descartarlo — es la diferencia entre un MP4 y un
+WebM con VP8.
+
 Los cuatro primeros van en MP4. VP8 solo se usa si ningún otro funciona, y en ese
 caso la salida es WebM: VP8 dentro de un MP4 produce un archivo que la mayoría de
 reproductores no abre. La UI indica siempre el contenedor y el códec obtenidos, y
