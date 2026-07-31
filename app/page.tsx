@@ -24,6 +24,7 @@ import {
 } from "@/lib/constants";
 import type {
   ColorMode,
+  OutputFormat,
   Range,
   Stage,
   WorkerRequest,
@@ -32,10 +33,11 @@ import type {
 
 type Result = {
   url: string;
+  blob: Blob;
   extension: string;
   bytes: number;
-  codec: string;
-  codecFailures: string[];
+  codec?: string;
+  codecFailures?: string[];
 };
 
 const CODEC_LABELS: Record<string, string> = {
@@ -82,6 +84,7 @@ export default function Home() {
 
   const [model, setModel] = useState<ModelKey>(DEFAULT_MODEL);
   const [colorMode, setColorMode] = useState<ColorMode>("grayscale");
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>("video");
   const [quality, setQuality] = useState<QualityKey>(DEFAULT_QUALITY);
   const [smoothing, setSmoothing] = useState<SmoothingKey>(DEFAULT_SMOOTHING);
   const [stabilize, setStabilize] = useState(true);
@@ -129,11 +132,11 @@ export default function Home() {
           return { blob: msg.blob, url: URL.createObjectURL(msg.blob) };
         });
       } else if (msg.type === "done") {
-        const blob = new Blob([msg.buffer], { type: msg.mimeType });
         setResult({
-          url: URL.createObjectURL(blob),
+          url: URL.createObjectURL(msg.blob),
+          blob: msg.blob,
           extension: msg.extension,
-          bytes: blob.size,
+          bytes: msg.blob.size,
           codec: msg.codec,
           codecFailures: msg.codecFailures,
         });
@@ -212,13 +215,25 @@ export default function Home() {
       model,
       colorMode,
       range,
+      outputFormat,
       quality,
       smoothing,
       stabilize,
       invert,
     };
     workerRef.current.postMessage(req);
-  }, [file, model, colorMode, range, quality, smoothing, stabilize, invert, reset]);
+  }, [
+    file,
+    model,
+    colorMode,
+    range,
+    outputFormat,
+    quality,
+    smoothing,
+    stabilize,
+    invert,
+    reset,
+  ]);
 
   const cancel = useCallback(() => {
     workerRef.current?.postMessage({ type: "cancel" } satisfies WorkerRequest);
@@ -292,6 +307,40 @@ export default function Home() {
         </label>
 
         <div className="flex flex-col gap-2 text-sm">
+          <span className="font-medium text-white/80">Formato</span>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["video", "Video"],
+                ["zip", "Secuencia PNG (ZIP)"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                disabled={busy}
+                onClick={() => setOutputFormat(value)}
+                className={[
+                  "rounded-lg border px-3 py-2 transition",
+                  outputFormat === value
+                    ? "border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white"
+                    : "border-[var(--color-edge)] text-white/70 hover:border-white/30",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {outputFormat === "zip" && (
+            <p className="text-xs text-white/45">
+              Un PNG sin pérdida por frame, sin códecs ni artefactos de
+              compresión. Pesa mucho más: cuenta con del orden de 100 MB por
+              cada 15 s a 1280 px.
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 text-sm">
           <span className="font-medium text-white/80">Salida</span>
           <div className="flex flex-wrap gap-2">
             {(
@@ -320,8 +369,15 @@ export default function Home() {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="font-medium text-white/80">Calidad</span>
+          <label
+            className={`flex flex-col gap-2 text-sm ${
+              outputFormat === "zip" ? "pointer-events-none opacity-40" : ""
+            }`}
+          >
+            <span className="font-medium text-white/80">
+              Calidad
+              {outputFormat === "zip" && " — no aplica al PNG, ya es sin pérdida"}
+            </span>
             <select
               value={quality}
               disabled={busy}
@@ -469,26 +525,31 @@ export default function Home() {
                 {formatBytes(result.bytes)})
               </a>
               <p className="text-center text-xs text-white/45">
-                {result.extension === "mp4" ? "MP4" : "WebM"} ·{" "}
-                {CODEC_LABELS[result.codec] ?? result.codec}
+                {result.extension === "zip"
+                  ? "Secuencia PNG · sin pérdida"
+                  : `${result.extension === "mp4" ? "MP4" : "WebM"} · ${
+                      (result.codec && CODEC_LABELS[result.codec]) ??
+                      result.codec
+                    }`}
               </p>
-              {result.extension !== "mp4" && (
+              {result.extension === "webm" && (
                 <div className="flex flex-col gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100/90">
                   <p>
                     Tu navegador solo pudo codificar{" "}
-                    {CODEC_LABELS[result.codec] ?? result.codec}, que no funciona
-                    bien dentro de un MP4. Renombrar el archivo no lo arreglaría:
-                    haría falta recodificar a H.264, y este navegador no puede.
-                    En Chrome o Edge deberías obtener un MP4.
+                    {(result.codec && CODEC_LABELS[result.codec]) ?? result.codec},
+                    que no funciona bien dentro de un MP4. Renombrar el archivo no
+                    lo arreglaría: haría falta recodificar a H.264, y este
+                    navegador no puede. Prueba en Chrome o Edge, o usa el formato
+                    Secuencia PNG, que no depende de códecs.
                   </p>
-                  {result.codecFailures.length > 0 && (
+                  {!!result.codecFailures?.length && (
                     <details>
                       <summary className="cursor-pointer select-none text-amber-100/70">
                         Ver por qué se descartó cada códec (
-                        {result.codecFailures.length})
+                        {result.codecFailures?.length})
                       </summary>
                       <ul className="mt-2 flex flex-col gap-1 font-mono text-[11px] text-amber-100/70">
-                        {result.codecFailures.map((f, i) => (
+                        {result.codecFailures?.map((f, i) => (
                           <li key={i} className="break-words">
                             {f}
                           </li>

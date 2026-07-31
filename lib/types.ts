@@ -5,6 +5,13 @@ export type Range = { start: number; end: number };
 
 export type ColorMode = "grayscale" | "inferno" | "sideBySide";
 
+/**
+ * `zip` writes one lossless PNG per frame. It sidesteps video encoding
+ * entirely — no codec negotiation, no compression artifacts — at the cost of a
+ * far larger download.
+ */
+export type OutputFormat = "video" | "zip";
+
 export type WorkerRequest =
   | {
       type: "process";
@@ -13,6 +20,7 @@ export type WorkerRequest =
       colorMode: ColorMode;
       /** Only this slice of the source video is decoded and processed. */
       range: Range;
+      outputFormat: OutputFormat;
       /** Encoding fidelity. Depth maps compress extremely well, so the default
        *  quantizer-based setting yields very small files that can band. */
       quality: QualityKey;
@@ -45,14 +53,14 @@ export type WorkerResponse =
     }
   | {
       type: "done";
-      buffer: ArrayBuffer;
-      mimeType: string;
+      blob: Blob;
       extension: string;
-      /** Which encoder actually produced the file, surfaced in the UI. */
-      codec: string;
+      /** Which encoder produced the file. Absent for PNG sequences, which do
+       *  not go through a video encoder at all. */
+      codec?: string;
       /** Every configuration the probe rejected, with the reason. Shown in the
        *  UI rather than only logged, since opening a console is a real hurdle. */
-      codecFailures: string[];
+      codecFailures?: string[];
     }
   | { type: "error"; message: string };
 

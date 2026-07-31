@@ -50,6 +50,19 @@ Dos formas de sacar un still, pensadas para alimentar modelos image-to-video:
 - **Primer frame en profundidad**: se publica en cuanto existe, sin esperar a
   que termine el clip, para flujos condicionados por profundidad.
 
+### Formatos de salida
+
+- **Video**: MP4 o WebM según lo que el navegador pueda codificar.
+- **Secuencia PNG (ZIP)**: un PNG sin pérdida por frame, nombrados
+  `depth_00001.png` en adelante. No pasa por ningún codificador de video, así
+  que evita tanto la negociación de códecs como los artefactos de compresión —
+  útil para VFX y para pipelines de IA sensibles al bandeo. A cambio pesa mucho
+  más, del orden de 100 MB por cada 15 s a 1280 px.
+
+El ZIP se escribe en streaming, agregando cada PNG conforme se produce en vez de
+acumularlos todos en memoria, y se almacena sin deflate: el PNG ya viene
+comprimido, así que recomprimir cuesta tiempo y no ahorra nada.
+
 ### Opciones disponibles
 
 - **Modelos**: Depth Anything V2 Small (por defecto), V2 Base y V1 Small.

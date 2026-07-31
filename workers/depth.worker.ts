@@ -33,7 +33,45 @@ import {
   OUTPUT_MAX_SIDE,
   SMOOTHING_LEVELS,
 } from "../lib/constants";
+import { Zip, ZipPassThrough } from "fflate";
+
 import type { ColorMode, WorkerRequest, WorkerResponse } from "../lib/types";
+
+/**
+ * Collects one PNG per frame into a ZIP. Frames are pushed in as they are
+ * produced rather than held until the end, and stored without deflate since
+ * PNG is already compressed — deflating again costs time and saves nothing.
+ */
+class PngSequenceWriter {
+  private readonly chunks: Uint8Array[] = [];
+  private readonly zip: Zip;
+  private readonly finished: Promise<void>;
+
+  constructor() {
+    let settle!: (err?: Error) => void;
+    this.finished = new Promise((resolve, reject) => {
+      settle = (err) => (err ? reject(err) : resolve());
+    });
+
+    this.zip = new Zip((err, chunk, final) => {
+      if (err) return settle(err);
+      if (chunk) this.chunks.push(chunk);
+      if (final) settle();
+    });
+  }
+
+  async add(name: string, blob: Blob) {
+    const entry = new ZipPassThrough(name);
+    this.zip.add(entry);
+    entry.push(new Uint8Array(await blob.arrayBuffer()), true);
+  }
+
+  async finish(): Promise<Blob> {
+    this.zip.end();
+    await this.finished;
+    return new Blob(this.chunks as BlobPart[], { type: "application/zip" });
+  }
+}
 
 // Models are fetched from the Hugging Face CDN at runtime, so nothing heavy
 // needs to live on the host. Set `env.remoteHost` to a self-hosted mirror if
@@ -306,8 +344,19 @@ async function pickWorkingCodec(
 /* -------------------------------------------------------------------------- */
 
 async function process(req: Extract<WorkerRequest, { type: "process" }>) {
-  const { file, model, colorMode, range, quality, smoothing, stabilize, invert } =
-    req;
+  const {
+    file,
+    model,
+    colorMode,
+    range,
+    outputFormat,
+    quality,
+    smoothing,
+    stabilize,
+    invert,
+  } = req;
+
+  const asZip = outputFormat === "zip";
 
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(
@@ -415,28 +464,48 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
             ),
           });
 
-  setPhase("selección de códec");
-  const {
-    codec,
-    useMp4,
-    options: codecOptions,
-    failures: codecFailures,
-  } = await pickWorkingCodec(canvasWidth, canvasHeight);
+  // A PNG sequence needs no encoder, so none of the codec negotiation applies.
+  let codec: VideoCodec | undefined;
+  let useMp4 = false;
+  let codecFailures: string[] | undefined;
+  let output: Output | null = null;
+  let source: CanvasSource | null = null;
+  const zipWriter = asZip ? new PngSequenceWriter() : null;
 
-  const output = new Output({
-    format: useMp4 ? new Mp4OutputFormat() : new WebMOutputFormat(),
-    target: new BufferTarget(),
-  });
+  if (!asZip) {
+    setPhase("selección de códec");
+    const picked = await pickWorkingCodec(canvasWidth, canvasHeight);
+    codec = picked.codec;
+    useMp4 = picked.useMp4;
+    codecFailures = picked.failures;
 
-  const source = new CanvasSource(outCanvas, {
-    codec,
-    quality: encodingQuality,
-    keyFrameInterval: 1,
-    ...codecOptions,
-  });
-  setPhase("apertura del codificador");
-  output.addVideoTrack(source, { frameRate: targetFps });
-  await output.start();
+    output = new Output({
+      format: useMp4 ? new Mp4OutputFormat() : new WebMOutputFormat(),
+      target: new BufferTarget(),
+    });
+    source = new CanvasSource(outCanvas, {
+      codec: picked.codec,
+      quality: encodingQuality,
+      keyFrameInterval: 1,
+      ...picked.options,
+    });
+    setPhase("apertura del codificador");
+    output.addVideoTrack(source, { frameRate: targetFps });
+    await output.start();
+  }
+
+  /** Writes the current outCanvas as one output frame. */
+  const emitFrame = async (index: number) => {
+    if (zipWriter) {
+      const png = await outCanvas.convertToBlob({ type: "image/png" });
+      await zipWriter.add(
+        `depth_${String(index + 1).padStart(5, "0")}.png`,
+        png,
+      );
+    } else {
+      await source!.add(index * frameStep, frameStep);
+    }
+  };
 
   post({
     type: "status",
@@ -465,7 +534,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
 
   for await (const wrapped of sink.canvasesAtTimestamps(sampleTimes)) {
     if (canceled) {
-      await output.cancel();
+      await output?.cancel();
       return;
     }
 
@@ -475,7 +544,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     if (!wrapped) {
       if (frameIndex === 0) continue;
       setPhase(`repetición del frame ${frameIndex + 1}`);
-      await source.add(frameIndex * frameStep, frameStep);
+      await emitFrame(frameIndex);
       frameIndex++;
       continue;
     }
@@ -559,7 +628,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     // Output timing comes from the grid, never from the source, so the result
     // is constant frame rate and starts at zero regardless of where the trim
     // began.
-    await source.add(frameIndex * frameStep, frameStep);
+    await emitFrame(frameIndex);
 
     frameIndex++;
 
@@ -608,23 +677,28 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   }
 
   setPhase("cierre del archivo");
-  post({ type: "status", stage: "encoding", message: "Cerrando el archivo…" });
-  await output.finalize();
+  post({
+    type: "status",
+    stage: "encoding",
+    message: asZip ? "Comprimiendo el ZIP…" : "Cerrando el archivo…",
+  });
 
-  const buffer = (output.target as BufferTarget).buffer;
+  if (zipWriter) {
+    post({ type: "done", blob: await zipWriter.finish(), extension: "zip" });
+    return;
+  }
+
+  await output!.finalize();
+  const buffer = (output!.target as BufferTarget).buffer;
   if (!buffer) throw new Error("No se pudo generar el archivo de salida.");
 
-  post(
-    {
-      type: "done",
-      buffer,
-      mimeType: useMp4 ? "video/mp4" : "video/webm",
-      extension: useMp4 ? "mp4" : "webm",
-      codec,
-      codecFailures,
-    },
-    [buffer],
-  );
+  post({
+    type: "done",
+    blob: new Blob([buffer], { type: useMp4 ? "video/mp4" : "video/webm" }),
+    extension: useMp4 ? "mp4" : "webm",
+    codec,
+    codecFailures,
+  });
 }
 
 self.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
