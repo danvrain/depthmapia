@@ -78,7 +78,13 @@ export const SMOOTHING_LEVELS = {
 } as const;
 
 export type SmoothingKey = keyof typeof SMOOTHING_LEVELS;
-export const DEFAULT_SMOOTHING: SmoothingKey = "soft";
+
+/**
+ * Smoothing strength is scaled per pixel by how much that pixel moved, so the
+ * strong setting no longer trails on motion the way a fixed blend did — it can
+ * be the default rather than a careful choice.
+ */
+export const DEFAULT_SMOOTHING: SmoothingKey = "strong";
 
 export const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 

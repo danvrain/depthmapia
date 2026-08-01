@@ -77,11 +77,17 @@ comprimido, así que recomprimir cuesta tiempo y no ahorra nada.
   donde aparece el bandeo — y profundidad bandeada es profundidad cuantizada.
   Medido a 1280x720: Alta da 0.11 Mbps, Muy alta 0.40 Mbps y Máxima 6.11 Mbps.
   Por defecto Máxima, que fija el bitrate en función de resolución y framerate.
-- **Suavizado temporal**: mezcla cada píxel con el del frame anterior, quitando
-  la vibración que queda tras estabilizar el rango global. Medido en una zona
-  estática, la variación media entre frames baja de 3.31 niveles a 1.71 (Suave)
-  o 1.00 (Fuerte). Valores altos dejan estela en movimientos rápidos, por eso es
-  un nivel y no un interruptor.
+- **Suavizado temporal**: mezcla cada píxel con el del frame anterior, con la
+  fuerza escalada según cuánto cambió ese píxel. El ruido temporal es un cambio
+  pequeño en zonas realmente estáticas, mientras que el movimiento produce
+  cambios grandes; suavizar todo por igual obliga a elegir entre dejar
+  vibración en el fondo o arrastrar lo que se mueve.
+
+  Medido sobre un fondo ruidoso con un borde en movimiento, con la mezcla fija
+  la vibración bajaba a 1.13 niveles pero el error en los bordes móviles subía a
+  38.91. Con la mezcla adaptativa la vibración queda en 1.60 y el error en 2.14
+  — por debajo incluso de no suavizar (3.00), porque quita ruido sin arrastrar.
+  Por defecto Fuerte, ya que el compromiso desapareció.
 
 ## Desarrollo
 

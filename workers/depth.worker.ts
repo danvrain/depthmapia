@@ -516,11 +516,16 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   // Exponential moving average of the depth range. Normalising each frame
   // independently makes the output flicker badly, because the min/max shift
   // frame to frame; smoothing the range removes almost all of it.
-  // Per-pixel exponential blending with the previous frame. The global range
-  // stabiliser below removes brightness pulsing; this removes the shimmer of
-  // individual pixels disagreeing frame to frame. Higher values trail on fast
-  // motion, so it is offered as a level rather than forced on.
+  // Per-pixel blending with the previous frame, weighted by how much that
+  // pixel actually changed. Shimmer is small frame-to-frame disagreement in
+  // areas that are really static, while genuine motion produces large changes.
+  // Smoothing everything equally forces a choice between leaving shimmer in the
+  // background and smearing whatever moves; keying the strength to the change
+  // lets the background settle while moving edges pass through untouched.
   const smoothAlpha = SMOOTHING_LEVELS[smoothing].alpha;
+
+  // Change, in 0-255 levels, at which smoothing is already halved.
+  const MOTION_KNEE = 10;
   const previousDepth =
     smoothAlpha > 0 ? new Float32Array(infSize.width * infSize.height) : null;
   let hasPrevious = false;
@@ -584,7 +589,11 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
       v = v < 0 ? 0 : v > 255 ? 255 : v;
 
       if (previousDepth) {
-        v = hasPrevious ? previousDepth[i] * smoothAlpha + v * (1 - smoothAlpha) : v;
+        if (hasPrevious) {
+          const change = Math.abs(v - previousDepth[i]) / MOTION_KNEE;
+          const weight = smoothAlpha / (1 + change * change);
+          v = previousDepth[i] * weight + v * (1 - weight);
+        }
         previousDepth[i] = v;
       }
 
