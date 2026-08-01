@@ -9,16 +9,19 @@ import { detectCapabilities, type Capabilities } from "@/lib/capabilities";
 import { baseName, downloadBlob } from "@/lib/download";
 import {
   DEFAULT_MODEL,
+  DEFAULT_MOTION_BLUR,
   DEFAULT_QUALITY,
   DEFAULT_SMOOTHING,
   MAX_CLIP_SECONDS,
   MAX_FILE_BYTES,
   MAX_SOURCE_SECONDS,
   MODELS,
+  MOTION_BLUR_LEVELS,
   QUALITY_LEVELS,
   SMOOTHING_LEVELS,
   formatBytes,
   type ModelKey,
+  type MotionBlurKey,
   type QualityKey,
   type SmoothingKey,
 } from "@/lib/constants";
@@ -87,6 +90,8 @@ export default function Home() {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("video");
   const [quality, setQuality] = useState<QualityKey>(DEFAULT_QUALITY);
   const [smoothing, setSmoothing] = useState<SmoothingKey>(DEFAULT_SMOOTHING);
+  const [motionBlur, setMotionBlur] =
+    useState<MotionBlurKey>(DEFAULT_MOTION_BLUR);
   const [stabilize, setStabilize] = useState(true);
   const [invert, setInvert] = useState(false);
 
@@ -218,6 +223,7 @@ export default function Home() {
       outputFormat,
       quality,
       smoothing,
+      motionBlur,
       stabilize,
       invert,
     };
@@ -230,6 +236,7 @@ export default function Home() {
     outputFormat,
     quality,
     smoothing,
+    motionBlur,
     stabilize,
     invert,
     reset,
@@ -415,6 +422,29 @@ export default function Home() {
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm sm:col-span-2">
+            <span className="font-medium text-white/80">
+              Desenfoque de movimiento
+            </span>
+            <select
+              value={motionBlur}
+              disabled={busy}
+              onChange={(e) => setMotionBlur(e.target.value as MotionBlurKey)}
+              className="rounded-lg border border-[var(--color-edge)] bg-[var(--color-ink)] px-3 py-2 outline-none focus:border-[var(--color-accent)]"
+            >
+              {Object.entries(MOTION_BLUR_LEVELS).map(([key, mb]) => (
+                <option key={key} value={key}>
+                  {mb.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-white/45">
+              El mapa de profundidad sale sin barrido de movimiento, y por eso a
+              25 o 30 fps el ojo percibe saltos. Esto lo reintroduce: más
+              fluidez a cambio de bordes menos definidos en lo que se mueve.
+            </span>
           </label>
         </div>
 

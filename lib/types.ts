@@ -1,4 +1,9 @@
-import type { ModelKey, QualityKey, SmoothingKey } from "./constants";
+import type {
+  ModelKey,
+  MotionBlurKey,
+  QualityKey,
+  SmoothingKey,
+} from "./constants";
 
 /** Selected portion of the source video, in seconds. */
 export type Range = { start: number; end: number };
@@ -26,6 +31,8 @@ export type WorkerRequest =
       quality: QualityKey;
       /** Per-pixel temporal blending, which removes frame-to-frame shimmer. */
       smoothing: SmoothingKey;
+      /** Frame blending that stands in for the motion blur a depth map lacks. */
+      motionBlur: MotionBlurKey;
       /** Smooths depth range across frames to stop the output from flickering. */
       stabilize: boolean;
       /** Invert so that near = black instead of near = white. */

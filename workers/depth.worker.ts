@@ -30,6 +30,7 @@ import {
   MAX_FILE_BYTES,
   MIN_CLIP_SECONDS,
   MODELS,
+  MOTION_BLUR_LEVELS,
   OUTPUT_MAX_SIDE,
   SMOOTHING_LEVELS,
 } from "../lib/constants";
@@ -352,6 +353,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
     outputFormat,
     quality,
     smoothing,
+    motionBlur,
     stabilize,
     invert,
   } = req;
@@ -534,6 +536,15 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
 
   // Change, in 0-255 levels, at which smoothing is already halved.
   const MOTION_KNEE = 10;
+
+  // Blending a fraction of the previous frame back in stands in for the motion
+  // blur a real camera produces. Deliberately uniform: the smear on moving
+  // edges is the whole point, and it is what makes crisp low-frame-rate footage
+  // read as continuous motion rather than a sequence of steps.
+  const blurAmount = MOTION_BLUR_LEVELS[motionBlur].amount;
+  const previousOutput =
+    blurAmount > 0 ? new Float32Array(infSize.width * infSize.height) : null;
+  let hasPreviousOutput = false;
   const previousDepth =
     smoothAlpha > 0 ? new Float32Array(infSize.width * infSize.height) : null;
   let hasPrevious = false;
@@ -605,6 +616,13 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
         previousDepth[i] = v;
       }
 
+      if (previousOutput) {
+        if (hasPreviousOutput) {
+          v = v * (1 - blurAmount) + previousOutput[i] * blurAmount;
+        }
+        previousOutput[i] = v;
+      }
+
       let g = v | 0;
       if (invert) g = 255 - g;
 
@@ -622,6 +640,7 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
 
     setPhase(`dibujado del frame ${frameIndex + 1}`);
     if (previousDepth) hasPrevious = true;
+    if (previousOutput) hasPreviousOutput = true;
     depthCtx.putImageData(depthImage, 0, 0);
 
     if (colorMode === "sideBySide") {

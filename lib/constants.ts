@@ -86,6 +86,21 @@ export type SmoothingKey = keyof typeof SMOOTHING_LEVELS;
  */
 export const DEFAULT_SMOOTHING: SmoothingKey = "strong";
 
+/**
+ * Frame blending that mimics camera motion blur. A depth map has none of its
+ * own: the model renders every frame perfectly crisp, so at 24-30 fps the eye
+ * reads motion as a series of discrete jumps. Film avoids this because a real
+ * shutter smears movement across each exposure.
+ */
+export const MOTION_BLUR_LEVELS = {
+  off: { label: "Desactivado", amount: 0 },
+  subtle: { label: "Sutil", amount: 0.25 },
+  cinematic: { label: "Cinematográfico", amount: 0.45 },
+} as const;
+
+export type MotionBlurKey = keyof typeof MOTION_BLUR_LEVELS;
+export const DEFAULT_MOTION_BLUR: MotionBlurKey = "subtle";
+
 export const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 
 export function formatBytes(bytes: number): string {

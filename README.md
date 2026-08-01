@@ -95,6 +95,20 @@ comprimido, así que recomprimir cuesta tiempo y no ahorra nada.
   — por debajo incluso de no suavizar (3.00), porque quita ruido sin arrastrar.
   Por defecto Fuerte, ya que el compromiso desapareció.
 
+### Desenfoque de movimiento
+
+Un mapa de profundidad no tiene barrido propio: el modelo dibuja cada frame
+perfectamente nítido. A 24-30 fps eso hace que el ojo lea el movimiento como
+una sucesión de saltos, porque falta lo que en cine aporta el obturador.
+
+Mezclar una fracción del frame anterior lo reintroduce. Medido sobre un borde
+duro desplazándose 8 px por frame a 25 fps, el salto medio entre frames baja de
+180 a 36 con el nivel Sutil, a cambio de un 24% menos de definición en el borde;
+el nivel Cinematográfico llega a 26 perdiendo un 43%.
+
+A diferencia del suavizado temporal, esta mezcla es deliberadamente uniforme:
+el arrastre en los bordes en movimiento es justamente el efecto buscado.
+
 ## Desarrollo
 
 ```bash
