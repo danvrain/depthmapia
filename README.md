@@ -1,7 +1,7 @@
 # DepthMapIA
 
 Plataforma para convertir videos cortos en mapas de profundidad. El usuario sube
-un video de hasta **20 MB**, recorta el tramo que le interesa (hasta **15
+un video de hasta **25 MB**, recorta el tramo que le interesa (hasta **15
 segundos**), la app genera el mapa de profundidad y le entrega el video listo
 para descargar.
 

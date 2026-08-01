@@ -10,7 +10,7 @@ export const MAX_SOURCE_SECONDS = 10 * 60;
 /** Shortest selection that still makes sense to process. */
 export const MIN_CLIP_SECONDS = 0.5;
 
-export const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
+export const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /**
  * Longest side fed to the depth model. Depth Anything V2 works at 518x518

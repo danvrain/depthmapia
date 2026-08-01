@@ -362,7 +362,9 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
 
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(
-      `El archivo pesa ${(file.size / 1048576).toFixed(1)} MB y el máximo es 20 MB.`,
+      `El archivo pesa ${(file.size / 1048576).toFixed(1)} MB y el máximo es ${(
+        MAX_FILE_BYTES / 1048576
+      ).toFixed(0)} MB.`,
     );
   }
 
