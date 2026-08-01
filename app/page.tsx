@@ -300,10 +300,17 @@ export default function Home() {
           >
             {Object.entries(MODELS).map(([key, m]) => (
               <option key={key} value={key}>
-                {m.label} — {m.note}
+                {m.label} — {m.note} ({m.license})
               </option>
             ))}
           </select>
+          {!MODELS[model].commercial && (
+            <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100/90">
+              Este modelo se publica bajo {MODELS[model].license}: solo uso no
+              comercial. Para trabajo comercial usa una de las variantes Small,
+              que son Apache-2.0.
+            </p>
+          )}
         </label>
 
         <div className="flex flex-col gap-2 text-sm">

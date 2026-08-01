@@ -21,24 +21,35 @@ export const INFERENCE_MAX_SIDE = 518;
 /** Longest side of the exported video. Frames above this are scaled down. */
 export const OUTPUT_MAX_SIDE = 1280;
 
+/**
+ * Licences differ per model and are not stated in the upstream repository's
+ * LICENSE file, which is Apache-2.0 and covers only the code. The weights are
+ * licensed separately, and only the Small variants permit commercial use.
+ */
 export const MODELS = {
   "depth-anything-v2-small": {
     id: "onnx-community/depth-anything-v2-small",
     label: "Depth Anything V2 Small",
     note: "Recomendado — 25M parámetros, mejor calidad/velocidad",
     dtype: "q8",
+    license: "Apache-2.0",
+    commercial: true,
   },
   "depth-anything-v2-base": {
     id: "onnx-community/depth-anything-v2-base",
     label: "Depth Anything V2 Base",
     note: "Más detalle, ~3x más lento y descarga más pesada",
     dtype: "q8",
+    license: "CC-BY-NC-4.0",
+    commercial: false,
   },
   "depth-anything-v1-small": {
     id: "Xenova/depth-anything-small-hf",
     label: "Depth Anything V1 Small",
     note: "Alternativa si V2 falla al cargar",
     dtype: "q8",
+    license: "Apache-2.0",
+    commercial: true,
   },
 } as const;
 

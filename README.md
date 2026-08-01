@@ -65,7 +65,8 @@ comprimido, así que recomprimir cuesta tiempo y no ahorra nada.
 
 ### Opciones disponibles
 
-- **Modelos**: Depth Anything V2 Small (por defecto), V2 Base y V1 Small.
+- **Modelos**: Depth Anything V2 Small (por defecto), V2 Base y V1 Small. Ver
+  las licencias más abajo antes de usar la app comercialmente.
 - **Salida**: escala de grises, colormap *inferno*, u original + depth lado a lado.
 - **Estabilizar**: suaviza el rango de profundidad entre frames. El modelo
   normaliza cada frame de forma independiente, lo que provoca un parpadeo muy
@@ -172,6 +173,21 @@ Los cuatro primeros van en MP4. VP8 solo se usa si ningún otro funciona, y en e
 caso la salida es WebM: VP8 dentro de un MP4 produce un archivo que la mayoría de
 reproductores no abre. La UI indica siempre el contenedor y el códec obtenidos, y
 la consola registra cuáles se descartaron y por qué.
+
+## Licencias de los modelos
+
+El archivo `LICENSE` del repositorio de Depth Anything V2 es Apache-2.0, pero
+**cubre solo el código**. Los pesos se licencian aparte, y eso únicamente se
+indica en su README:
+
+| Modelo | Licencia | Uso comercial |
+|---|---|---|
+| Depth Anything V2 Small | Apache-2.0 | Permitido |
+| Depth Anything V2 Base | CC-BY-NC-4.0 | **No permitido** |
+| Depth Anything V1 Small | Apache-2.0 | Permitido |
+
+La app muestra la licencia junto a cada modelo y avisa al seleccionar uno no
+comercial. Si vas a cobrar por el servicio, quédate en las variantes Small.
 
 ## Estructura
 
