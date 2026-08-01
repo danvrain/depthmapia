@@ -406,7 +406,15 @@ async function process(req: Extract<WorkerRequest, { type: "process" }>) {
   // light and back up again. Copying those timestamps through reproduces the
   // unevenness, and it reads as micro-stutter on a depth map, where there is no
   // motion blur or texture to hide it. Resampling onto a fixed grid fixes it.
-  const targetFps = Math.min(60, Math.max(1, Math.round(fps)));
+  // Never sample below the source's peak rate. A variable-rate clip that
+  // alternates between 24 and 30 fps averages out to ~27, and sampling at 27
+  // silently discards the frames that only exist in the 30 fps stretches —
+  // dropped frames are what judder actually is. Snapping up to the next
+  // standard rate duplicates a few frames instead, which is far less visible.
+  const STANDARD_FRAME_RATES = [24, 25, 30, 48, 50, 60];
+  const targetFps =
+    STANDARD_FRAME_RATES.find((rate) => rate >= fps - 0.2) ??
+    Math.min(60, Math.max(1, Math.ceil(fps)));
   const frameCount = Math.max(1, Math.round(duration * targetFps));
   const frameStep = 1 / targetFps;
 

@@ -40,6 +40,12 @@ la salida tenía intervalos de 0 a 66 ms entre frames; con la rejilla, todos los
 intervalos son idénticos y la duración se conserva. Como efecto secundario, el
 total de frames pasa a ser exacto en vez de estimado.
 
+El framerate de la rejilla nunca baja del pico del origen. Esa misma fuente
+promedia 26.52 fps, y muestrearla a 27 descartaba 29 de sus 240 frames — los que
+solo existen en los tramos a 30 fps. Descartar frames *es* el tirón. Subiendo al
+estándar siguiente (30 fps) se pierden 2 en vez de 29, y a cambio se duplican
+algunos en los tramos lentos, que se nota mucho menos.
+
 ### Capturas para motores de video por IA
 
 Dos formas de sacar un still, pensadas para alimentar modelos image-to-video:
