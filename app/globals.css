@@ -3,20 +3,25 @@
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: "Archivo Variable", var(--font-geist-sans), sans-serif;
 
-  /* Near-black canvas with a single light accent. The product is grayscale
-     depth, so the interface stays monochrome and lets the imagery carry it. */
-  --color-ink: #050506;
-  --color-panel: #0c0c0e;
+  /* Brand turquoise, sampled from the reel: bright for fills and progress,
+     mid for rules and strikes, deep for the shaded face of slanted blocks. */
+  --color-brand: #44e4dc;
+  --color-brand-mid: #34b8b0;
+  --color-brand-deep: #2ca098;
+
+  --color-ink: #040606;
+  --color-panel: #0a0d0d;
   --color-edge: rgb(255 255 255 / 0.09);
-  --color-accent: #f4f4f5;
-  --color-warm: #ffc796;
+  /* Components that predate the brand read this token, so they follow it. */
+  --color-accent: #44e4dc;
 }
 
 html,
 body {
   background: var(--color-ink);
-  color: #ededef;
+  color: #ecefef;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -26,16 +31,45 @@ body {
 }
 
 ::selection {
-  background: rgb(255 199 150 / 0.3);
+  background: rgb(68 228 220 / 0.35);
+  color: #fff;
 }
 
-/* Native selects, restyled to match the panel instead of the OS default. */
+/* Heavy condensed italic caps — the reel's headline voice. */
+.display {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 78%;
+  text-transform: uppercase;
+  letter-spacing: -0.015em;
+  line-height: 0.86;
+}
+
+/* Small monospaced caps used for every HUD label. */
+.hud {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.dot-grid {
+  background-image: radial-gradient(rgb(255 255 255 / 0.11) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+/* Native selects, restyled to match the panels instead of the OS default. */
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='1.6' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2344e4dc' stroke-width='1.8' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   padding-right: 2.25rem;
+}
+
+input[type="range"] {
+  accent-color: var(--color-brand);
 }
 
 /* Fine film grain over everything, so the flat blacks do not band. */
@@ -47,6 +81,15 @@ select {
   z-index: 50;
   opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.rec-dot {
+  animation: rec-pulse 1.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

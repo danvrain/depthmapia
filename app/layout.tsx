@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
+// Variable width and weight, so the display face can go condensed and black.
+import "@fontsource-variable/archivo/wdth-italic.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

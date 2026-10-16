@@ -70,6 +70,21 @@ inferencia satura la GPU y no deben competir — y también cuando sale de panta
 o la pestaña queda en segundo plano. three.js se carga bajo demanda, fuera de la
 carga inicial.
 
+### Comparar original y profundidad
+
+Además del relieve 3D, el resultado se puede ver como una cortina entre el frame
+original donde empezó el recorte y su mapa de profundidad, arrastrando el
+divisor.
+
+### Identidad visual
+
+Turquesa de marca en tres tonos — `#44E4DC` para rellenos y progreso, `#34B8B0`
+para líneas, `#2CA098` para la cara sombreada de los bloques inclinados — sobre
+negro. Titulares en Archivo variable, en cursiva, negra y condensada; etiquetas
+en Geist Mono en mayúsculas. Los tokens viven en `app/globals.css` y las piezas
+de interfaz (esquinas de visor, etiquetas, barras segmentadas, bloque inclinado,
+cintas en movimiento) en `components/hud.tsx`.
+
 ### Formatos de salida
 
 - **Video**: MP4 o WebM según lo que el navegador pueda codificar.

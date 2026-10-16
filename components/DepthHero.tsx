@@ -48,11 +48,11 @@ const fragmentShader = /* glsl */ `
 
   void main() {
     // Brightness follows height, exactly like a depth map: near reads white,
-    // far fades to nothing. Only the closest peaks pick up a warm tint.
+    // far fades to nothing. The closest peaks pick up the brand turquoise.
     float near = clamp(vHeight, 0.0, 1.2);
     vec3 grey = vec3(0.16 + 0.84 * smoothstep(0.0, 1.0, near));
-    vec3 warm = vec3(1.0, 0.78, 0.55);
-    vec3 color = mix(grey, warm, smoothstep(0.8, 1.15, near) * 0.55);
+    vec3 brand = vec3(0.267, 0.894, 0.863);
+    vec3 color = mix(grey, brand, smoothstep(0.55, 1.1, near) * 0.85);
     float alpha = vFade * (0.18 + 0.82 * smoothstep(0.02, 0.9, near));
     gl_FragColor = vec4(color, alpha);
   }
@@ -168,7 +168,7 @@ export function DepthHero({
       const portrait = camera.aspect < 1;
       const distance = portrait ? 6.4 : 4.4;
       camera.position.set(0, distance * 0.42, distance);
-      camera.lookAt(0, portrait ? 2 : 0.12, 0);
+      camera.lookAt(0, portrait ? 2 : 0.42, 0);
       camera.updateProjectionMatrix();
     };
 

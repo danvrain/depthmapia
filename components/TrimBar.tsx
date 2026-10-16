@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Corners, Tag } from "@/components/hud";
 import { MAX_CLIP_SECONDS, MIN_CLIP_SECONDS } from "@/lib/constants";
 import { baseName, downloadBlob, timeTag } from "@/lib/download";
 import type { Range } from "@/lib/types";
@@ -268,34 +269,36 @@ export function TrimBar({
   const atLimit = selected >= MAX_CLIP_SECONDS - 0.05;
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-[var(--color-edge)] bg-[var(--color-panel)]/60 p-5">
+    <section className="flex flex-col gap-4 rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel)] p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-white/80">Recorta tu video</h2>
+        <h2 className="hud text-white/80">Recorte</h2>
         <span
-          className={`rounded-full px-2.5 py-1 text-xs ${
-            atLimit
-              ? "bg-amber-400/15 text-amber-200"
-              : "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
+          className={`font-mono text-[11px] uppercase tracking-[0.14em] ${
+            atLimit ? "text-amber-200" : "text-[var(--color-brand)]"
           }`}
         >
-          {selected.toFixed(1)}s seleccionados
-          {atLimit && ` · máximo ${MAX_CLIP_SECONDS}s`}
+          {selected.toFixed(1)} s seleccionados
+          {atLimit && ` · máx ${MAX_CLIP_SECONDS} s`}
         </span>
       </div>
 
-      <video
-        ref={videoRef}
-        src={url}
-        muted
-        playsInline
-        onEnded={() => setPlaying(false)}
-        className="max-h-64 w-full rounded-xl bg-black object-contain"
-      />
+      <div className="relative overflow-hidden rounded-md bg-black">
+        <video
+          ref={videoRef}
+          src={url}
+          muted
+          playsInline
+          onEnded={() => setPlaying(false)}
+          className="max-h-72 w-full object-contain"
+        />
+        <Tag className="absolute left-6 top-6">El original</Tag>
+        <Corners inset={10} size={12} className="border-white/40" />
+      </div>
 
       <div
         ref={trackRef}
         onPointerDown={(e) => !disabled && seek(timeAt(e.clientX))}
-        className={`relative h-14 touch-none select-none overflow-hidden rounded-lg bg-black/50 ${
+        className={`relative h-14 touch-none select-none overflow-hidden rounded-md bg-black/50 ${
           disabled ? "opacity-50" : ""
         }`}
       >
@@ -353,27 +356,33 @@ export function TrimBar({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-white/50">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={togglePlay}
           disabled={disabled}
-          className="rounded-lg border border-[var(--color-edge)] px-3 py-1.5 text-white/80 transition hover:border-white/30 disabled:opacity-40"
+          className="px-3 py-2 text-white/80 ring-1 ring-white/20 transition hover:text-white hover:ring-white/40 disabled:opacity-40"
         >
-          {playing ? "Pausar" : "Reproducir selección"}
+          <span className="hud text-[10px]">
+            {playing ? "❚❚ Pausar" : "▶ Reproducir selección"}
+          </span>
         </button>
         <button
           type="button"
           onClick={captureFrame}
           disabled={disabled || capturing}
           title="Guarda el frame donde está la línea blanca, en PNG y a resolución original"
-          className="rounded-lg border border-[var(--color-edge)] px-3 py-1.5 text-white/80 transition hover:border-white/30 disabled:opacity-40"
+          className="px-3 py-2 text-[var(--color-brand)] ring-1 ring-[var(--color-brand)]/50 transition hover:bg-[var(--color-brand)]/10 hover:ring-[var(--color-brand)] disabled:opacity-40"
         >
-          {capturing ? "Guardando…" : "Capturar frame (PNG)"}
+          <span className="hud text-[10px]">
+            {capturing ? "Guardando…" : "◎ Capturar frame · PNG"}
+          </span>
         </button>
-        <span>Inicio {formatTime(value.start)}</span>
-        <span>Fin {formatTime(value.end)}</span>
-        <span className="ml-auto">Duración total {formatTime(duration)}</span>
+        <span className="hud ml-auto flex gap-4 text-[10px] text-white/40">
+          <span>In {formatTime(value.start)}</span>
+          <span>Out {formatTime(value.end)}</span>
+          <span className="hidden sm:inline">Total {formatTime(duration)}</span>
+        </span>
       </div>
     </section>
   );
