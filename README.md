@@ -127,6 +127,9 @@ npm run build    # genera ./out
 4. Listo. No hace falta activar Node.js ni configurar nada más — son archivos
    estáticos.
 
+En cPanel no hay contador de videos generados, porque necesita el servidor de
+Railway para guardar el total; la app lo detecta y simplemente no lo muestra.
+
 > Los pesos del modelo se descargan desde el CDN de Hugging Face la primera vez
 > que alguien usa la app y quedan en la caché del navegador. Si prefieres
 > servirlos desde tu propio dominio, define `env.remoteHost` en
@@ -150,9 +153,10 @@ descargando los pesos del modelo desde el CDN de Hugging Face.
 
 ## Desplegar en Railway
 
-El repo incluye `Dockerfile`, `Caddyfile` y `railway.json`. Railway detecta el
-Dockerfile y sirve el export estático con Caddy, ya con las cabeceras COOP/COEP
-configuradas.
+El repo incluye `Dockerfile` y `railway.json`. Railway construye la app y la
+sirve con `server/index.mjs`, un servidor Node sin dependencias que entrega el
+export estático con las cabeceras COOP/COEP y además lleva el contador global
+de videos generados.
 
 ```bash
 railway init
@@ -161,10 +165,19 @@ railway up
 
 O conecta el repo desde el dashboard de Railway y despliega en cada push.
 
+### Volumen para el contador
+
+El total se guarda en `/data/counter.json`. **Sin un volumen montado en `/data`
+el contador vuelve a cero en cada deploy**, porque el disco del contenedor se
+descarta. En Railway: servicio → **Settings → Volumes → New Volume**, con mount
+path `/data`. La ruta se cambia con la variable `COUNTER_FILE`.
+
+El contador acepta un incremento por IP cada 10 segundos. Es un número para
+mostrar, no una métrica de facturación: frena a un script casual, no a alguien
+decidido a inflarlo.
+
 Railway **no ofrece GPU** fuera del plan Enterprise, así que la inferencia sigue
-corriendo en el navegador igual que en cPanel — Railway solo actúa como host.
-La ventaja sobre cPanel es el deploy automático desde git y poder añadir un
-backend después sin cambiar de proveedor.
+corriendo en el navegador — el servidor solo entrega archivos y cuenta.
 
 ## Requisitos del navegador
 
@@ -221,6 +234,7 @@ comercial. Si vas a cobrar por el servicio, quédate en las variantes Small.
 app/                 UI (Next.js App Router, export estático)
 components/          Dropzone, editor de recorte, aviso de compatibilidad
 lib/                 Límites, catálogo de modelos, tipos compartidos
+server/              Servidor de producción: estáticos + contador global
 workers/             Worker con decodificación, inferencia y codificación
 ```
 

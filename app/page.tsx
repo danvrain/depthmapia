@@ -6,6 +6,7 @@ import { CompatBanner } from "@/components/CompatBanner";
 import { Dropzone } from "@/components/Dropzone";
 import { TrimBar } from "@/components/TrimBar";
 import { detectCapabilities, type Capabilities } from "@/lib/capabilities";
+import { fetchVideoCount, recordVideo } from "@/lib/counter";
 import { baseName, downloadBlob } from "@/lib/download";
 import {
   DEFAULT_MODEL,
@@ -74,6 +75,8 @@ export default function Home() {
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   const [caps, setCaps] = useState<Capabilities | null>(null);
+  // Null until the server answers, and stays null where there is no server.
+  const [videoCount, setVideoCount] = useState<number | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [range, setRange] = useState<Range>({ start: 0, end: MAX_CLIP_SECONDS });
@@ -100,6 +103,7 @@ export default function Home() {
 
   useEffect(() => {
     detectCapabilities().then(setCaps);
+    fetchVideoCount().then(setVideoCount);
   }, []);
 
   useEffect(() => {
@@ -144,6 +148,9 @@ export default function Home() {
           bytes: msg.blob.size,
           codec: msg.codec,
           codecFailures: msg.codecFailures,
+        });
+        recordVideo().then((total) => {
+          if (total !== null) setVideoCount(total);
         });
         setProgress(1);
         setStage("done");
@@ -259,6 +266,14 @@ export default function Home() {
           y descárgalos convertidos en mapa de profundidad. Todo corre en tu
           navegador — el archivo nunca se sube a ningún servidor.
         </p>
+        {videoCount !== null && (
+          <p className="text-sm text-white/45">
+            <span className="font-medium text-white/80">
+              {videoCount.toLocaleString("es")}
+            </span>{" "}
+            {videoCount === 1 ? "video generado" : "videos generados"}
+          </p>
+        )}
       </header>
 
       <CompatBanner caps={caps} />
