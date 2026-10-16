@@ -56,6 +56,20 @@ Dos formas de sacar un still, pensadas para alimentar modelos image-to-video:
 - **Primer frame en profundidad**: se publica en cuanto existe, sin esperar a
   que termine el clip, para flujos condicionados por profundidad.
 
+### Vista 3D del resultado
+
+Al terminar, el resultado se muestra como relieve en 3D (three.js) que se gira
+arrastrando y se acerca con la rueda, con un control de intensidad. Sirve para
+comprobar que la profundidad salió bien antes de llevarla a otra herramienta.
+En el estilo *Lado a lado* el relieve toma la forma del depth y el color del
+original. El colormap *inferno* no se puede ver en 3D, porque su brillo no crece
+de forma monótona con la profundidad y no puede convertirse de vuelta en altura.
+
+El relieve animado del inicio se pausa mientras se procesa un video — la
+inferencia satura la GPU y no deben competir — y también cuando sale de pantalla
+o la pestaña queda en segundo plano. three.js se carga bajo demanda, fuera de la
+carga inicial.
+
 ### Formatos de salida
 
 - **Video**: MP4 o WebM según lo que el navegador pueda codificar.
@@ -232,7 +246,7 @@ comercial. Si vas a cobrar por el servicio, quédate en las variantes Small.
 
 ```
 app/                 UI (Next.js App Router, export estático)
-components/          Dropzone, editor de recorte, aviso de compatibilidad
+components/          Dropzone, editor de recorte, hero y visor 3D, controles
 lib/                 Límites, catálogo de modelos, tipos compartidos
 server/              Servidor de producción: estáticos + contador global
 workers/             Worker con decodificación, inferencia y codificación

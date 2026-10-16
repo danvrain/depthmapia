@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "DepthMapIA — Mapas de profundidad para tus videos",
   description:
-    "Sube un video de hasta 15 segundos y descárgalo convertido en mapa de profundidad. Todo se procesa en tu navegador.",
+    "Convierte cualquier video en un mapa de profundidad. Gratis, sin registro, y todo se procesa en tu navegador.",
 };
 
 export default function RootLayout({
@@ -13,8 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className="min-h-screen antialiased">{children}</body>
+    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="grain min-h-screen antialiased">{children}</body>
     </html>
   );
 }

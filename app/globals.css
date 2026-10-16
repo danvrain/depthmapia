@@ -1,22 +1,59 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #05070d;
-  --color-panel: #0d1220;
-  --color-edge: #1d2436;
-  --color-accent: #5b8cff;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Near-black canvas with a single light accent. The product is grayscale
+     depth, so the interface stays monochrome and lets the imagery carry it. */
+  --color-ink: #050506;
+  --color-panel: #0c0c0e;
+  --color-edge: rgb(255 255 255 / 0.09);
+  --color-accent: #f4f4f5;
+  --color-warm: #ffc796;
 }
 
 html,
 body {
   background: var(--color-ink);
-  color: #e8ecf6;
+  color: #ededef;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background-image:
-    radial-gradient(60rem 40rem at 15% -10%, rgba(91, 140, 255, 0.16), transparent 60%),
-    radial-gradient(50rem 40rem at 95% 0%, rgba(160, 90, 255, 0.12), transparent 55%);
-  background-attachment: fixed;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: rgb(255 199 150 / 0.3);
+}
+
+/* Native selects, restyled to match the panel instead of the OS default. */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a1a1aa' stroke-width='1.6' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.25rem;
+}
+
+/* Fine film grain over everything, so the flat blacks do not band. */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

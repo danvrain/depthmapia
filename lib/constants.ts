@@ -57,9 +57,9 @@ export type ModelKey = keyof typeof MODELS;
 export const DEFAULT_MODEL: ModelKey = "depth-anything-v2-small";
 
 export const QUALITY_LEVELS = {
-  high: { label: "Alta", note: "archivo mínimo, puede bandear" },
-  veryHigh: { label: "Muy alta", note: "equilibrada" },
-  max: { label: "Máxima", note: "recomendado — bitrate fijo, sin bandeo" },
+  high: { label: "Alta", note: "Archivo mínimo; puede mostrar bandeo." },
+  veryHigh: { label: "Muy alta", note: "Equilibrio entre tamaño y fidelidad." },
+  max: { label: "Máxima", note: "Recomendada: bitrate fijo, sin bandeo." },
 } as const;
 
 export type QualityKey = keyof typeof QUALITY_LEVELS;
